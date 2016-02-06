@@ -1,0 +1,6 @@
+Light fork of fluidsynth (1.0.9, without glib dependencies) for embedded devices
+
+- read sample from disk on demand instead of loading everything in memory
+- optimised DSP functions for ARM cortex-m
+
+Includes an example synth for linux (LightFluidSynth.hpp & synth.cpp) using RtAudio and RtMidi.
