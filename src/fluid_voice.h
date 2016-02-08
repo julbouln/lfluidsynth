@@ -41,7 +41,7 @@ enum fluid_voice_status
  * envelope data
  */
 struct _fluid_env_data_t {
-	unsigned int count;
+	uint32_t count;
 	fluid_real_t coeff;
 	fluid_real_t incr;
 	fluid_real_t min;
@@ -74,10 +74,10 @@ struct _fluid_voice_t
 	fluid_channel_t* channel;
 	fluid_gen_t gen[GEN_LAST];
 	fluid_mod_t mod[FLUID_NUM_MOD];
-	int mod_count;
+	uint8_t mod_count;
 	uint8_t has_looped;                 /* Flag that is set as soon as the first loop is completed. */
 	fluid_sample_t* sample;
-	int check_sample_sanity_flag;   /* Flag that initiates, that sample-related parameters
+	uint8_t check_sample_sanity_flag;   /* Flag that initiates, that sample-related parameters
 					   have to be checked. */
 
 	/* basic parameters */
@@ -118,7 +118,7 @@ struct _fluid_voice_t
 	/* vol env */
 	fluid_env_data_t volenv_data[FLUID_VOICE_ENVLAST];
 	uint32_t volenv_count;
-	int volenv_section;
+	uint8_t volenv_section;
 	fluid_real_t volenv_val;
 	fluid_real_t amplitude_that_reaches_noise_floor_nonloop;
 	fluid_real_t amplitude_that_reaches_noise_floor_loop;
@@ -126,7 +126,7 @@ struct _fluid_voice_t
 	/* mod env */
 	fluid_env_data_t modenv_data[FLUID_VOICE_ENVLAST];
 	uint32_t modenv_count;
-	int modenv_section;
+	uint8_t modenv_section;
 	fluid_real_t modenv_val;         /* the value of the modulation envelope */
 	fluid_real_t modenv_to_fc;
 	fluid_real_t modenv_to_pitch;
@@ -153,7 +153,7 @@ struct _fluid_voice_t
 	fluid_real_t q_lin;             /* the q-factor on a linear scale */
 	fluid_real_t filter_gain;       /* Gain correction factor, depends on q */
 	fluid_real_t hist1, hist2;      /* Sample history for the IIR filter */
-	int filter_startup;             /* Flag: If set, the filter will be set directly.
+	uint8_t filter_startup;             /* Flag: If set, the filter will be set directly.
 					   Else it changes smoothly. */
 
 	/* filter coefficients */
@@ -185,10 +185,6 @@ struct _fluid_voice_t
 
 	/* interpolation method, as in fluid_interp in fluidsynth.h */
 	int interp_method;
-
-	/* for debugging */
-	int debug;
-	double ref;
 };
 
 

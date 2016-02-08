@@ -7,6 +7,9 @@ SYNTH_CFLAGS=-Irt -D__LINUX_ALSA__
 # -DALSA_SUPPORT -DPULSE_SUPPORT 
 #-DPULSE_SUPPORT -DFLUID_ENABLE_THREAD
 
+# for massif and callgrind
+SF2_PROF_FILE=4gmgsmt.sf2
+
 all: $(FLUIDSYNTH_OBJS)
 	g++ $(CFLAGS) $(SYNTH_CFLAGS) rt/RtMidi.cpp rt/RtAudio.cpp synth.cpp -o synth $^ -lc -lm -lpthread -lasound
 	objdump -St synth >synth.lst
@@ -22,10 +25,10 @@ test: timgm6mb.sf2 $(FLUIDSYNTH_OBJS)
 	gcc $(CFLAGS) test.c -o test $(FLUIDSYNTH_OBJS) -lc -lm
 
 callgrind: synth
-	pasuspender -- valgrind --dsymutil=yes --tool=callgrind ./synth merlin.sf2
+	pasuspender -- valgrind --dsymutil=yes --tool=callgrind ./synth $(SF2_PROF_FILE)
 
 massif: synth
-	pasuspender -- valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./synth merlin.sf2
+	pasuspender -- valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./synth $(SF2_PROF_FILE)
 	ms_print massif.out > massif.log
 
 clean:

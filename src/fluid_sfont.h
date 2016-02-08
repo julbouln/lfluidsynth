@@ -174,7 +174,7 @@ struct _fluid_sample_t
       filled out automatically */
   /* Set this to zero, when submitting a new sample. */
   int amplitude_that_reaches_noise_floor_is_valid; 
-  double amplitude_that_reaches_noise_floor;
+  fluid_real_t amplitude_that_reaches_noise_floor;
 
   /** Count the number of playing voices that use this sample. */
   uint32_t refcount;

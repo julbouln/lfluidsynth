@@ -1,4 +1,4 @@
-Light fork of fluidsynth (1.0.9, without glib dependencies) for embedded devices
+Light fork of fluidsynth (1.0.9, without glib dependencies) for embedded devices (tested successfully on STM32F746 with external memory https://github.com/julbouln/stm32f7discovery_midi_synth).
 
 - read sample from disk on demand instead of loading everything in memory
 - optimised DSP functions for ARM Cortex-M4

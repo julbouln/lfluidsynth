@@ -143,7 +143,6 @@ fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
   voice->sample = sample;
   voice->start_time = start_time;
   voice->ticks = 0;
-  voice->debug = 0;
   voice->has_looped = 0; /* Will be set during voice_write when the 2nd loop point is reached */
   voice->last_fres = -1; /* The filter coefficients have to be calculated later in the DSP loop. */
   voice->filter_startup = 1; /* Set the filter immediately, don't fade between old and new settings */
@@ -272,7 +271,6 @@ int fluid_voice_calc_vol_mod_env(fluid_voice_t *voice) {
 
   if (voice->volenv_section == FLUID_VOICE_ENVFINISHED)
   {
-    fluid_profile (FLUID_PROF_VOICE_RELEASE, voice->ref);
     fluid_voice_off (voice);
     return 1;
   }
@@ -409,7 +407,6 @@ int fluid_voice_calc_amp(fluid_voice_t *voice) {
      * can safely turn off the voice. Duh. */
     if (amp_max < amplitude_that_reaches_noise_floor)
     {
-      fluid_profile (FLUID_PROF_VOICE_RELEASE, voice->ref);
       fluid_voice_off (voice);
       return 1;
     }
@@ -945,7 +942,6 @@ fluid_voice_write(fluid_voice_t* voice,
   /* turn off voice if short count (sample ended and not looping) */
   if (count < FLUID_BUFSIZE)
   {
-    fluid_profile(FLUID_PROF_VOICE_RELEASE, voice->ref);
     fluid_voice_off(voice);
   }
 // post_process:
@@ -977,8 +973,6 @@ void fluid_voice_start(fluid_voice_t* voice)
   /* Force setting of the phase at the first DSP loop run
    * This cannot be done earlier, because it depends on modulators.*/
   voice->check_sample_sanity_flag = FLUID_SAMPLESANITY_STARTUP;
-
-  voice->ref = fluid_profile_ref();
 
   voice->status = FLUID_VOICE_ON;
 }
@@ -1728,7 +1722,6 @@ int fluid_voice_modulate_all(fluid_voice_t* voice)
 int
 fluid_voice_noteoff(fluid_voice_t* voice)
 {
-  fluid_profile(FLUID_PROF_VOICE_NOTE, voice->ref);
 
   if (voice->channel && fluid_channel_sustained(voice->channel)) {
     voice->status = FLUID_VOICE_SUSTAINED;
@@ -1809,8 +1802,6 @@ fluid_voice_kill_excl(fluid_voice_t* voice) {
 int
 fluid_voice_off(fluid_voice_t* voice)
 {
-  fluid_profile(FLUID_PROF_VOICE_RELEASE, voice->ref);
-
   voice->chan = NO_CHANNEL;
   voice->volenv_section = FLUID_VOICE_ENVFINISHED;
   voice->volenv_count = 0;
