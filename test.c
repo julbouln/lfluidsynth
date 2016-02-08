@@ -1,10 +1,23 @@
 /* simple test */
 #include "lfluidsynth.h"
+#include "fluid_defsfont.h"
+#include "fluid_gen.h"
+#include "fluid_list.h"
+
 
 int main() {
 	fluid_synth_t* synth;
 	fluid_settings_t* settings;
 	int sfont_id;
+
+
+  printf("sizeof(fluid_inst_zone_t) %d\n",sizeof(fluid_inst_zone_t));
+  printf("sizeof(fluid_sample_t) %d\n",sizeof(fluid_sample_t));
+  printf("sizeof(fluid_gen_t) %d\n",sizeof(fluid_gen_t));
+  printf("sizeof(fluid_list_t) %d\n",sizeof(fluid_list_t));
+  printf("GEN_LAST (%d) * sizeof(fluid_gen_t) %d\n",GEN_LAST,GEN_LAST*sizeof(fluid_gen_t));
+  printf("sizeof(fluid_mod_t) %d\n",sizeof(fluid_mod_t));
+  printf("sizeof(fluid_voice_t) %d\n",sizeof(fluid_voice_t));
 
 	/* Create the settings. */
 	settings = new_fluid_settings();

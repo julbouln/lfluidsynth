@@ -697,6 +697,7 @@ fluid_voice_calc(fluid_voice_t *voice,
   uint32_t dsp_phase_index;
   uint32_t end_index;
   uint8_t looping;
+  uint64_t loop_size;
 
   uint32_t index_incr,fract_incr;
 
@@ -712,8 +713,9 @@ fluid_voice_calc(fluid_voice_t *voice,
 
   looping = voice->is_looping;
   end_index = looping ? voice->loopend - 1 : voice->end;
+  loop_size = (uint64_t)(voice->loopend - voice->loopstart) << 32;
 
-  float in;
+  fluid_real_t in;
 
 #ifdef FLUID_CALC_INTERPOLATE_LINEAR
   fluid_real_t *coeffs;
@@ -723,14 +725,13 @@ fluid_voice_calc(fluid_voice_t *voice,
   uint32_t blkCnt;                               /* loop counter */
 
   /* Run the below code for Cortex-M4 and Cortex-M3 */
-  float in1, in2, in3, in4;                  /* temporary variabels */
+  fluid_real_t in1, in2, in3, in4;                  /* temporary variabels */
 
   /*loop Unrolling */
   blkCnt = FLUID_BUFSIZE >> 2u;
 
     while (blkCnt > 0u)
     {
-
       dsp_phase_index = dsp_phase >> 32;
 
 #ifdef FLUID_CALC_INTERPOLATE_LINEAR
@@ -749,8 +750,6 @@ fluid_voice_calc(fluid_voice_t *voice,
 #else
       in2 = *(buf + dsp_phase_index);
 #endif      
-      /* multiply with scaling factor */
-      in1 = in1 * dsp_amp;
 
       dsp_phase += dsp_phase_incr;
       dsp_phase_index = dsp_phase >> 32;
@@ -761,9 +760,6 @@ fluid_voice_calc(fluid_voice_t *voice,
 #else
       in3 = *(buf + dsp_phase_index);
 #endif
-
-      /* multiply with scaling factor */
-      in2 = in2 * dsp_amp;
 
       dsp_phase += dsp_phase_incr;
       dsp_phase_index = dsp_phase >> 32;
@@ -776,6 +772,8 @@ fluid_voice_calc(fluid_voice_t *voice,
 #endif
 
       /* multiply with scaling factor */
+      in1 = in1 * dsp_amp;
+      in2 = in2 * dsp_amp;
       in3 = in3 * dsp_amp;
       in4 = in4 * dsp_amp;
 
@@ -794,22 +792,21 @@ fluid_voice_calc(fluid_voice_t *voice,
       dsp_phase += dsp_phase_incr;
       dsp_amp += dsp_amp_incr;
 
-      dsp_phase_index = dsp_phase >> 32;
-
-      if (dsp_phase_index > end_index)
-      {
+      if (((dsp_phase + 4) >> 32) > end_index)
+        {
         if(looping) 
         {
-          dsp_phase -= ((uint64_t)(voice->loopend - voice->loopstart) << 32);
+          dsp_phase -= loop_size;
           voice->has_looped = 1;
         } else {          
           break;
         }
       }
 
-      dsp_i += 4u;
       blkCnt--;
     }
+
+    dsp_i = (FLUID_BUFSIZE - blkCnt * 4);
 
 #else
 
@@ -831,18 +828,17 @@ fluid_voice_calc(fluid_voice_t *voice,
       dsp_phase += dsp_phase_incr;
       dsp_amp += dsp_amp_incr;
 
-      dsp_phase_index = dsp_phase >> 32;
-
-      if (dsp_phase_index > end_index)
-      {
+      if (((dsp_phase + 4) >> 32) > end_index)
+        {
         if(looping) 
         {
-          dsp_phase -= ((uint64_t)(voice->loopend - voice->loopstart) << 32);
+          dsp_phase -= loop_size;
           voice->has_looped = 1;
-        } else {
+        } else {          
           break;
         }
       }
+
     }
 #endif
 

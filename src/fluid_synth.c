@@ -1704,8 +1704,8 @@ int fluid_synth_process(fluid_synth_t* synth, int len,
  */
 int
 fluid_synth_write_float(fluid_synth_t* synth, int len,
-		       void* lout, int loff, int lincr,
-		       void* rout, int roff, int rincr)
+                        void* lout, int loff, int lincr,
+                        void* rout, int roff, int rincr)
 {
   int i, j, k, l;
   float* left_out = (float*) lout;
@@ -1723,21 +1723,21 @@ fluid_synth_write_float(fluid_synth_t* synth, int len,
 
   for (i = 0, j = loff, k = roff; i < len; i++, l++, j += lincr, k += rincr) {
     /* fill up the buffers as needed */
-      if (l == FLUID_BUFSIZE) {
-	fluid_synth_one_block(synth, 0);
-	l = 0;
-      }
+    if (l == FLUID_BUFSIZE) {
+      fluid_synth_one_block(synth, 0);
+      l = 0;
+    }
 
-      left_out[j] = (float) left_in[l];
-      right_out[k] = (float) right_in[l];
+    left_out[j] = (float) left_in[l];
+    right_out[k] = (float) right_in[l];
   }
 
   synth->cur = l;
 
   time = fluid_utime() - time;
   synth->cpu_load = 0.5 * (synth->cpu_load +
-			   time * synth->sample_rate / len / 10000.0);
-/*   printf("CPU: %.2f\n", synth->cpu_load); */
+                           time * synth->sample_rate / len / 10000.0);
+  /*   printf("CPU: %.2f\n", synth->cpu_load); */
 
   return 0;
 }
@@ -1780,8 +1780,8 @@ roundi (float x)
  */
 int
 fluid_synth_write_s16(fluid_synth_t* synth, int len,
-		     void* lout, int loff, int lincr,
-		     void* rout, int roff, int rincr)
+                      void* lout, int loff, int lincr,
+                      void* rout, int roff, int rincr)
 {
   int i, j, k, l;
   signed short* left_out = (signed short*) lout;
@@ -1811,11 +1811,11 @@ fluid_synth_write_s16(fluid_synth_t* synth, int len,
     right_sample =  (right_in[l] * 32766.0f);
 
     /* digital clipping */
-    if (left_sample > 32767.0f) left_sample = 32767.0f;
+/*    if (left_sample > 32767.0f) left_sample = 32767.0f;
     if (left_sample < -32768.0f) left_sample = -32768.0f;
     if (right_sample > 32767.0f) right_sample = 32767.0f;
     if (right_sample < -32768.0f) right_sample = -32768.0f;
-
+*/
     left_out[j] = (signed short) left_sample;
     right_out[k] = (signed short) right_sample;
   }
@@ -1827,8 +1827,8 @@ fluid_synth_write_s16(fluid_synth_t* synth, int len,
 
 int
 fluid_synth_write_s32(fluid_synth_t* synth, int len,
-         void* lout, int loff, int lincr,
-         void* rout, int roff, int rincr)
+                      void* lout, int loff, int lincr,
+                      void* rout, int roff, int rincr)
 {
   int i, j, k, l;
   int32_t* left_out = (int32_t*) lout;
@@ -1858,10 +1858,11 @@ fluid_synth_write_s32(fluid_synth_t* synth, int len,
     right_sample =  (right_in[l] * 2147483646.0f);
 
     /* digital clipping */
-    if (left_sample > 2147483647.0f) left_sample = 2147483647.0f;
+/*    if (left_sample > 2147483647.0f) left_sample = 2147483647.0f;
     if (left_sample < -2147483647.0f) left_sample = -2147483647.0f;
     if (right_sample > 2147483647.0f) right_sample = 2147483647.0f;
     if (right_sample < -2147483647.0f) right_sample = -2147483647.0f;
+*/
 
     left_out[j] = (int32_t) left_sample;
     right_out[k] = (int32_t) right_sample;
@@ -1918,6 +1919,7 @@ fluid_synth_dither_s16(int *dither_index, int len, float* lin, float* rin,
   fluid_profile(FLUID_PROF_WRITE_S16, prof_ref);
 }
 
+
 void fluid_synth_sampledata_clean(fluid_synth_t* synth) {
 #ifdef FLUID_SAMPLE_READ_DISK
   if(fluid_sample_mem >= FLUID_SAMPLE_MAX_MEM) {
@@ -1925,46 +1927,6 @@ void fluid_synth_sampledata_clean(fluid_synth_t* synth) {
     fluid_sfont_t *sfont=fluid_synth_get_sfont_by_id(synth, synth->sfont_id);
     fluid_sampledata_clean(sfont,synth->ticks);
   }
-#if 0
-  int i;
-//  printf("fluid_synth_clean_voices\n");
-  for (i = 0; i < synth->polyphony; i++) {
-    fluid_voice_t *voice = synth->voice[i];
-
-//    if (voice->status==FLUID_VOICE_OFF)
-//    printf("%d %d\n",i,voice->status);
-
-    if (voice->status == FLUID_VOICE_ENDING) {
-      if (voice->sample) {
-        fluid_sample_decr_ref(voice->sample);
-
-//        printf("%d %d %x\n", i, voice->sample->refcount, voice->sample);
-
-        if (voice->sample->refcount == 0) {
-          int ni = synth->ticks - voice->start_time;
-//          printf("TICKS %d\n",ni);
-          if (ni >= FLUID_SAMPLE_CACHE_LIFETIME) {
-//        printf("LIFETIME %d %d %d %d\n",synth->noteid,voice->start_time,voice->ticks,ni);
-            fluid_sampledata_reset(voice->sample->data);
-            voice->status = FLUID_VOICE_OFF;
-            voice->chan = NO_CHANNEL;
-            voice->sample = NULL;
-
-          } else {
-            fluid_sample_incr_ref(voice->sample);
-          }
-        }
-
-      }
- //         if (voice->status == FLUID_VOICE_OFF) {
-//                  if (voice->sample) {
-// printf("%d %d %x\n", i, voice->sample->refcount, voice->sample);
-//}
-  //}
-
-    }
-  }
-  #endif
 #endif
 }
 
@@ -1981,9 +1943,6 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
   fluid_real_t* reverb_buf;
   fluid_real_t* chorus_buf;
   int byte_size = FLUID_BUFSIZE * sizeof(fluid_real_t);
-  double prof_ref = fluid_profile_ref();
-
-/*   fluid_mutex_lock(synth->busy); /\* Here comes the audio thread. Lock the synth. *\/ */
 
   /* clean the audio buffers */
   for (i = 0; i < synth->nbuf; i++) {
@@ -2003,15 +1962,11 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
   reverb_buf = synth->with_reverb ? synth->fx_left_buf[0] : NULL;
   chorus_buf = synth->with_chorus ? synth->fx_left_buf[1] : NULL;
 
-  fluid_profile(FLUID_PROF_ONE_BLOCK_CLEAR, prof_ref);
-
   /* call all playing synthesis processes */
   for (i = 0; i < synth->polyphony; i++) {
     voice = synth->voice[i];
 
     if (_PLAYING(voice)) {
-      double prof_ref_voice = fluid_profile_ref();
-
       /* The output associated with a MIDI channel is wrapped around
        * using the number of audio groups as modulo divider.  This is
        * typically the number of output channels on the 'sound card',
@@ -2030,12 +1985,8 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
       right_buf = synth->right_buf[auchan];
 
       fluid_voice_write(voice, left_buf, right_buf, reverb_buf, chorus_buf);
-
-      fluid_profile(FLUID_PROF_ONE_BLOCK_VOICE, prof_ref_voice);
-    }
+   }
   }
-
-  fluid_profile(FLUID_PROF_ONE_BLOCK_VOICES, prof_ref);
 
 #if 0
   /* if multi channel output, don't mix the output of the chorus and
@@ -2092,13 +2043,6 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
 #ifdef FLUID_SAMPLE_GC
  fluid_synth_sampledata_clean(synth);
 #endif
-
-  /* Testcase, that provokes a denormal floating point error */
-#if 0
-  {float num=1;while (num != 0){num*=0.5;};};
-#endif
-
-/*   fluid_mutex_unlock(synth->busy); /\* Allow other threads to touch the synth *\/ */
 
   return 0;
 }

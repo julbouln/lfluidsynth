@@ -52,25 +52,25 @@
 
 typedef struct _SFVersion
 {				/* version structure */
-  unsigned short major;
-  unsigned short minor;
+  uint16_t major;
+  uint16_t minor;
 }
 SFVersion;
 
 typedef struct _SFMod
 {				/* Modulator structure */
-  unsigned short src;			/* source modulator */
-  unsigned short dest;			/* destination generator */
-  signed short amount;		/* signed, degree of modulation */
-  unsigned short amtsrc;		/* second source controls amnt of first */
-  unsigned short trans;		/* transform applied to source */
+  uint16_t src;			/* source modulator */
+  uint16_t dest;			/* destination generator */
+  int16_t amount;		/* signed, degree of modulation */
+  uint16_t amtsrc;		/* second source controls amnt of first */
+  uint16_t trans;		/* transform applied to source */
 }
 SFMod;
 
 typedef union _SFGenAmount
 {				/* Generator amount structure */
-  signed short sword;			/* signed 16 bit value */
-  unsigned short uword;		/* unsigned 16 bit value */
+  int16_t sword;			/* signed 16 bit value */
+  uint16_t uword;		/* unsigned 16 bit value */
   struct
   {
     uint8_t lo;			/* low value for ranges */
@@ -82,7 +82,7 @@ SFGenAmount;
 
 typedef struct _SFGen
 {				/* Generator structure */
-  unsigned short id;			/* generator ID */
+  uint16_t id;			/* generator ID */
   SFGenAmount amount;		/* generator value */
 }
 SFGen;
@@ -99,21 +99,21 @@ typedef struct _SFSample
 {				/* Sample structure */
   char name[21];		/* Name of sample */
   uint8_t samfile;		/* Loaded sfont/sample buffer = 0/1 */
-  unsigned int start;		/* Offset in sample area to start of sample */
-  unsigned int end;			/* Offset from start to end of sample,
+  uint32_t start;		/* Offset in sample area to start of sample */
+  uint32_t end;			/* Offset from start to end of sample,
 				   this is the last point of the
 				   sample, the SF spec has this as the
 				   1st point after, corrected on
 				   load/save */
-  unsigned int loopstart;		/* Offset from start to start of loop */
-  unsigned int loopend;		/* Offset from start to end of loop,
+  uint32_t loopstart;		/* Offset from start to start of loop */
+  uint32_t loopend;		/* Offset from start to end of loop,
 				   marks the first point after loop,
 				   whose sample value is ideally
 				   equivalent to loopstart */
-  unsigned int samplerate;		/* Sample rate recorded at */
+  uint32_t samplerate;		/* Sample rate recorded at */
   uint8_t origpitch;		/* root midi key number */
   signed char pitchadj;		/* pitch correction in cents */
-  unsigned short sampletype;		/* 1 mono,2 right,4 left,linked 8,0x8000=ROM */
+  uint16_t sampletype;		/* 1 mono,2 right,4 left,linked 8,0x8000=ROM */
 }
 SFSample;
 
@@ -127,11 +127,11 @@ SFInst;
 typedef struct _SFPreset
 {				/* Preset structure */
   char name[21];		/* preset name */
-  unsigned short prenum;		/* preset number */
-  unsigned short bank;			/* bank number */
-  unsigned int libr;			/* Not used (preserved) */
-  unsigned int genre;		/* Not used (preserved) */
-  unsigned int morph;		/* Not used (preserved) */
+  uint16_t prenum;		/* preset number */
+  uint16_t bank;			/* bank number */
+  uint32_t libr;			/* Not used (preserved) */
+  uint32_t genre;		/* Not used (preserved) */
+  uint32_t morph;		/* Not used (preserved) */
   fluid_list_t *zone;			/* list of preset zones */
 }
 SFPreset;
@@ -141,8 +141,8 @@ typedef struct _SFData
 {				/* Sound font data structure */
   SFVersion version;		/* sound font version */
   SFVersion romver;		/* ROM version */
-  unsigned int samplepos;		/* position within sffd of the sample chunk */
-  unsigned int samplesize;		/* length within sffd of the sample chunk */
+  uint32_t samplepos;		/* position within sffd of the sample chunk */
+  uint32_t samplesize;		/* length within sffd of the sample chunk */
   char *fname;			/* file name */
   fluid_file sffd;			/* loaded sfont file descriptor */
   fluid_list_t *info;		     /* linked list of info strings (1st byte is ID) */
@@ -553,7 +553,11 @@ struct _fluid_preset_zone_t
   int keyhi;
   int vello;
   int velhi;
+  #ifdef FLUID_NEW_GEN_API
+  fluid_list_t *gen;
+  #else
   fluid_gen_t gen[GEN_LAST];
+  #endif
   fluid_mod_t * mod; /* List of modulators */
 };
 
@@ -590,11 +594,15 @@ struct _fluid_inst_zone_t
   fluid_inst_zone_t* next;
   char* name;
   fluid_sample_t* sample;
-  int keylo;
-  int keyhi;
-  int vello;
-  int velhi;
+  uint8_t keylo;
+  uint8_t keyhi;
+  uint8_t vello;
+  uint8_t velhi;
+  #ifdef FLUID_NEW_GEN_API
+  fluid_list_t *gen;
+  #else
   fluid_gen_t gen[GEN_LAST];
+  #endif
   fluid_mod_t * mod; /* List of modulators */
 };
 

@@ -40,7 +40,7 @@ struct _fluid_mod_t
   uint8_t flags1;
   uint8_t src2;
   uint8_t flags2;
-  double amount;
+  fluid_real_t amount;
   /* The 'next' field allows to link modulators into a list.  It is
    * not used in fluid_voice.c, there each voice allocates memory for a
    * fixed number of modulators.  Since there may be a huge number of

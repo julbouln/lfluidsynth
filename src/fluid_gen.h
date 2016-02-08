@@ -23,6 +23,7 @@
 #define _FLUID_GEN_H
 
 #include "fluid_types.h"
+#include "fluid_list.h"
 
 typedef struct _fluid_gen_info_t {
 	char num;		/* Generator number */
@@ -111,6 +112,9 @@ enum fluid_gen_type {
  */
 typedef struct _fluid_gen_t
 {
+#ifdef FLUID_NEW_GEN_API
+  uint8_t num;
+#endif
   uint8_t flags; /**< Is the generator set or not (#fluid_gen_flags) */
   fluid_real_t val;          /**< The nominal value */
   fluid_real_t mod;          /**< Change by modulators */
@@ -127,11 +131,23 @@ enum fluid_gen_flags
   GEN_ABS_NRPN		/**< DOCME */
 };
 
+
+/* NEW API */
+  #ifdef FLUID_NEW_GEN_API
+fluid_gen_t * fluid_gen_create(uint8_t num);
+fluid_gen_t *fluid_gen_get(fluid_list_t *gen_list, uint8_t num);
+fluid_real_t fluid_gen_get_default_value(uint8_t num);
+void fluid_gen_delete(fluid_gen_t *gen);
+#endif
+/* NEW API */
+
+
 int fluid_gen_set_default_values(fluid_gen_t* gen);
+int fluid_gen_init(fluid_gen_t* gen, fluid_channel_t* channel);
+
 
 fluid_real_t fluid_gen_scale(int gen, fluid_real_t value);
 fluid_real_t fluid_gen_scale_nrpn(int gen, int nrpn);
-int fluid_gen_init(fluid_gen_t* gen, fluid_channel_t* channel);
 
 #define fluid_gen_set_mod(_gen, _val)  { (_gen)->mod = (fluid_real_t) (_val); }
 #define fluid_gen_set_nrpn(_gen, _val) { (_gen)->nrpn = (fluid_real_t) (_val); }
