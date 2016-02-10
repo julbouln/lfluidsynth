@@ -14,8 +14,10 @@ int main() {
   printf("sizeof(fluid_inst_zone_t) %d\n",sizeof(fluid_inst_zone_t));
   printf("sizeof(fluid_sample_t) %d\n",sizeof(fluid_sample_t));
   printf("sizeof(fluid_gen_t) %d\n",sizeof(fluid_gen_t));
+  printf("sizeof(fluid_mod_t) %d\n",sizeof(fluid_mod_t));
   printf("sizeof(fluid_list_t) %d\n",sizeof(fluid_list_t));
   printf("GEN_LAST (%d) * sizeof(fluid_gen_t) %d\n",GEN_LAST,GEN_LAST*sizeof(fluid_gen_t));
+  printf("FLUID_NUM_MOD (%d) * sizeof(fluid_mod_t) %d\n",FLUID_NUM_MOD,FLUID_NUM_MOD*sizeof(fluid_mod_t));
   printf("sizeof(fluid_mod_t) %d\n",sizeof(fluid_mod_t));
   printf("sizeof(fluid_voice_t) %d\n",sizeof(fluid_voice_t));
 

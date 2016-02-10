@@ -73,7 +73,11 @@ struct _fluid_voice_t
 	uint8_t vel;              /* the velocity */
 	fluid_channel_t* channel;
 	fluid_gen_t gen[GEN_LAST];
+#ifdef FLUID_NEW_VOICE_MOD_API
+	fluid_list_t *mod;
+#else
 	fluid_mod_t mod[FLUID_NUM_MOD];
+#endif
 	uint8_t mod_count;
 	uint8_t has_looped;                 /* Flag that is set as soon as the first loop is completed. */
 	fluid_sample_t* sample;
@@ -184,7 +188,7 @@ struct _fluid_voice_t
 	fluid_real_t amp_chorus;
 
 	/* interpolation method, as in fluid_interp in fluidsynth.h */
-	int interp_method;
+	uint8_t interp_method;
 };
 
 
@@ -255,7 +259,6 @@ fluid_real_t fluid_voice_gen_value(fluid_voice_t* voice, int num);
 #define FLUID_SAMPLESANITY_CHECK (1 << 0)
 #define FLUID_SAMPLESANITY_STARTUP (1 << 1)
 
-
 /* defined in fluid_dsp_float.c */
 
 void fluid_dsp_float_config (void);
@@ -270,13 +273,6 @@ int fluid_dsp_float_interpolate_7th_order (fluid_voice_t *voice);
    *  The interface to the synthesizer's voices
    *  Examples on using them can be found in fluid_defsfont.c
    */
-
-  /** Update all the synthesis parameters, which depend on generator gen. 
-      This is only necessary after changing a generator of an already operating voice.
-      Most applications will not need this function.*/
-
-void fluid_voice_update_param(fluid_voice_t* voice, int gen); 
-
 
   /* for fluid_voice_add_mod */
 enum fluid_voice_add_mod{

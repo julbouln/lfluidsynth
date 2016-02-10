@@ -116,6 +116,16 @@ delete_fluid_voice(fluid_voice_t* voice)
     return FLUID_OK;
   }
 
+#ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_list_t *p;
+  p = voice->mod;
+  while (p != NULL) {
+      fluid_mod_t *tmp = (fluid_mod_t *) p->data;
+      FLUID_FREE(tmp);
+      p = fluid_list_next(p);
+  }
+#endif
+
   FLUID_FREE(voice);
   return FLUID_OK;
 }
@@ -1067,6 +1077,18 @@ fluid_voice_calculate_runtime_synthesis_parameters(fluid_voice_t* voice)
    * fluid_gen_set_default_values.
    */
 
+#ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_list_t *p;
+  p = voice->mod;
+  while (p != NULL) {
+    fluid_mod_t* mod = (fluid_mod_t *) p->data;
+    fluid_real_t modval = fluid_mod_get_value(mod, voice->channel, voice);
+    int dest_gen_index = mod->dest;
+    fluid_gen_t* dest_gen = &voice->gen[dest_gen_index];
+    dest_gen->mod += modval;
+    p = fluid_list_next(p);
+  }
+#else
   for (i = 0; i < voice->mod_count; i++) {
     fluid_mod_t* mod = &voice->mod[i];
     fluid_real_t modval = fluid_mod_get_value(mod, voice->channel, voice);
@@ -1075,7 +1097,7 @@ fluid_voice_calculate_runtime_synthesis_parameters(fluid_voice_t* voice)
     dest_gen->mod += modval;
     /*      fluid_dump_modulator(mod); */
   }
-
+#endif
   /* The GEN_PITCH is a hack to fit the pitch bend controller into the
    * modulator paradigm.  Now the nominal pitch of the key is set.
    * Note about SCALETUNE: SF2.01 8.1.3 says, that this generator is a
@@ -1085,10 +1107,9 @@ fluid_voice_calculate_runtime_synthesis_parameters(fluid_voice_t* voice)
    */
   if (fluid_channel_has_tuning(voice->channel)) {
     /* pitch(60) + scale * (pitch(key) - pitch(60)) */
-#define __pitch(_k) fluid_tuning_get_pitch(tuning, _k)
     fluid_tuning_t* tuning = fluid_channel_get_tuning(voice->channel);
-    voice->gen[GEN_PITCH].val = (__pitch(60) + (voice->gen[GEN_SCALETUNE].val / 100.0f *
-                                 (__pitch(voice->key) - __pitch(60))));
+    voice->gen[GEN_PITCH].val = (fluid_tuning_get_pitch(tuning,60) + (voice->gen[GEN_SCALETUNE].val / 100.0f *
+                                 (fluid_tuning_get_pitch(tuning,voice->key) - fluid_tuning_get_pitch(tuning,60))));
   } else {
     voice->gen[GEN_PITCH].val = (voice->gen[GEN_SCALETUNE].val * (voice->key - 60.0f)
                                  + 100.0f * 60.0f);
@@ -1640,6 +1661,42 @@ int fluid_voice_modulate(fluid_voice_t* voice, int cc, int ctrl)
 
   /*    printf("Chan=%d, CC=%d, Src=%d, Val=%d\n", voice->channel->channum, cc, ctrl, val); */
 
+#ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_list_t *p1;
+  fluid_list_t *p2;
+  p1 = voice->mod;
+  p2 = voice->mod;
+  while (p1 != NULL) {
+    mod = (fluid_mod_t *) p1->data;
+
+    /* step 1: find all the modulators that have the changed controller
+     * as input source. */
+    if (fluid_mod_has_source(mod, cc, ctrl)) {
+
+      gen = fluid_mod_get_dest(mod);
+      modval = 0.0;
+
+      /* step 2: for every changed modulator, calculate the modulation
+       * value of its associated generator */
+      while (p2 != NULL) {
+        fluid_mod_t *lmod = (fluid_mod_t *) p2->data;
+        if (fluid_mod_has_dest(lmod, gen)) {
+          modval += fluid_mod_get_value(lmod, voice->channel, voice);
+        }
+        p2 = fluid_list_next(p2);
+      }
+
+      fluid_gen_set_mod(&voice->gen[gen], modval);
+
+      /* step 3: now that we have the new value of the generator,
+       * recalculate the parameter values that are derived from the
+       * generator */
+      fluid_voice_update_param(voice, gen);
+    }
+    p1 = fluid_list_next(p1);
+  }
+
+#else
   for (i = 0; i < voice->mod_count; i++) {
 
     mod = &voice->mod[i];
@@ -1667,6 +1724,8 @@ int fluid_voice_modulate(fluid_voice_t* voice, int cc, int ctrl)
       fluid_voice_update_param(voice, gen);
     }
   }
+#endif
+
   return FLUID_OK;
 }
 
@@ -1691,7 +1750,34 @@ int fluid_voice_modulate_all(fluid_voice_t* voice)
      that generator as destination. It's not an error, just a wast of
      energy (think polution, global warming, unhappy musicians,
      ...) */
+#ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_list_t *p1;
+  fluid_list_t *p2;
+  p1 = voice->mod;
+  p2 = voice->mod;
+  while (p1 != NULL) {
+    mod = (fluid_mod_t *) p1->data;
+    gen = fluid_mod_get_dest(mod);
+    modval = 0.0;
 
+    /* Accumulate the modulation values of all the modulators with
+     * destination generator 'gen' */
+    while (p2 != NULL) {
+      fluid_mod_t *lmod=(fluid_mod_t *) p2->data;
+      if (fluid_mod_has_dest(lmod, gen)) {
+        modval += fluid_mod_get_value(lmod, voice->channel, voice);
+      }
+      p2 = fluid_list_next(p2);
+    }
+
+    fluid_gen_set_mod(&voice->gen[gen], modval);
+
+    /* Update the parameter values that are depend on the generator
+     * 'gen' */
+    fluid_voice_update_param(voice, gen);
+    p1 = fluid_list_next(p1);
+  }
+#else
   for (i = 0; i < voice->mod_count; i++) {
 
     mod = &voice->mod[i];
@@ -1712,7 +1798,7 @@ int fluid_voice_modulate_all(fluid_voice_t* voice)
      * 'gen' */
     fluid_voice_update_param(voice, gen);
   }
-
+#endif
   return FLUID_OK;
 }
 
@@ -1864,8 +1950,34 @@ fluid_voice_add_mod(fluid_voice_t* voice, fluid_mod_t* mod, int mode)
     return;
   }
 
-  if (mode == FLUID_VOICE_ADD) {
+#ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_mod_t* cmod=NULL;
+  fluid_list_t *p;
+  p = voice->mod;
+  while (p != NULL) {
+      fluid_mod_t *lmod = (fluid_mod_t *) p->data;
+      if (fluid_mod_test_identity(lmod, mod)) {
+        cmod=lmod;
+        break;
+      }
+      p = fluid_list_next(p);
+  }
 
+  if(!cmod) {
+    cmod=FLUID_NEW(fluid_mod_t);
+    fluid_mod_clone(cmod, mod);
+    voice->mod=fluid_list_append(voice->mod,cmod);
+  }
+
+  if (mode == FLUID_VOICE_ADD) {
+    cmod->amount += mod->amount;
+  } else if (mode == FLUID_VOICE_OVERWRITE) {
+    cmod->amount = mod->amount;
+  }
+
+#else
+
+  if (mode == FLUID_VOICE_ADD) {
     /* if identical modulator exists, add them */
     for (i = 0; i < voice->mod_count; i++) {
       if (fluid_mod_test_identity(&voice->mod[i], mod)) {
@@ -1874,9 +1986,7 @@ fluid_voice_add_mod(fluid_voice_t* voice, fluid_mod_t* mod, int mode)
         return;
       }
     }
-
   } else if (mode == FLUID_VOICE_OVERWRITE) {
-
     /* if identical modulator exists, replace it (only the amount has to be changed) */
     for (i = 0; i < voice->mod_count; i++) {
       if (fluid_mod_test_identity(&voice->mod[i], mod)) {
@@ -1893,6 +2003,7 @@ fluid_voice_add_mod(fluid_voice_t* voice, fluid_mod_t* mod, int mode)
   if (voice->mod_count < FLUID_NUM_MOD) {
     fluid_mod_clone(&voice->mod[voice->mod_count++], mod);
   }
+#endif
 }
 
 unsigned int fluid_voice_get_id(fluid_voice_t* voice)
@@ -1923,7 +2034,42 @@ fluid_real_t fluid_voice_get_lower_boundary_for_attenuation(fluid_voice_t* voice
   fluid_mod_t* mod;
   fluid_real_t possible_att_reduction_cB = 0;
   fluid_real_t lower_bound;
+  #ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_list_t *p;
+  p = voice->mod;
+  while (p != NULL) {
+    mod = (fluid_mod_t *) p->data;
 
+    /* Modulator has attenuation as target and can change over time? */
+    if ((mod->dest == GEN_ATTENUATION)
+    && ((mod->flags1 & FLUID_MOD_CC) || (mod->flags2 & FLUID_MOD_CC))) {
+
+      fluid_real_t current_val = fluid_mod_get_value(mod, voice->channel, voice);
+      fluid_real_t v = FLUID_ABS(mod->amount);
+
+      if ((mod->src1 == FLUID_MOD_PITCHWHEEL)
+      || (mod->flags1 & FLUID_MOD_BIPOLAR)
+      || (mod->flags2 & FLUID_MOD_BIPOLAR)
+      || (mod->amount < 0)) {
+        /* Can this modulator produce a negative contribution? */
+        v *= -1.0;
+      } else {
+        /* No negative value possible. But still, the minimum contribution is 0. */
+        v = 0;
+      }
+
+      /* For example:
+       * - current_val=100
+       * - min_val=-4000
+       * - possible_att_reduction_cB += 4100
+       */
+      if (current_val > v) {
+        possible_att_reduction_cB += (current_val - v);
+      }
+    }
+    p = fluid_list_next(p);
+  }
+#else
   for (i = 0; i < voice->mod_count; i++) {
     mod = &voice->mod[i];
 
@@ -1955,6 +2101,7 @@ fluid_real_t fluid_voice_get_lower_boundary_for_attenuation(fluid_voice_t* voice
       }
     }
   }
+  #endif
 
   lower_bound = voice->attenuation - possible_att_reduction_cB;
 

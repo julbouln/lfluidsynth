@@ -1,14 +1,16 @@
 FLUIDSYNTH_OBJS=$(patsubst %.c,%.o,$(wildcard src/*.c))
 # fluidsynth/drivers/fluid_alsa.o fluidsynth/drivers/fluid_pulse.o
 CFLAGS=-O3 -g -I. -Isrc
-CFLAGS+= -DFLUID_SAMPLE_FORMAT_FLOAT -DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC -DFLUID_SAMPLE_READ_CHUNK -DFLUID_NEW_GEN_API
+CFLAGS+= -DFLUID_SAMPLE_FORMAT_FLOAT -DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC -DFLUID_SAMPLE_READ_CHUNK -DFLUID_NEW_GEN_API -DFLUID_NEW_VOICE_MOD_API
+#CFLAGS+=-march=native
+#CFLAGS+=-ftree-vectorize -ffast-math -fsingle-precision-constant
 SYNTH_CFLAGS=-Irt -D__LINUX_ALSA__ 
 #-D__LINUX_PULSE__ 
 # -DALSA_SUPPORT -DPULSE_SUPPORT 
 #-DPULSE_SUPPORT -DFLUID_ENABLE_THREAD
 
 # for massif and callgrind
-SF2_PROF_FILE=4gmgsmt.sf2
+SF2_PROF_FILE=merlin.sf2
 
 all: $(FLUIDSYNTH_OBJS)
 	g++ $(CFLAGS) $(SYNTH_CFLAGS) rt/RtMidi.cpp rt/RtAudio.cpp synth.cpp -o synth $^ -lc -lm -lpthread -lasound

@@ -775,11 +775,7 @@ fluid_defpreset_noteon(fluid_defpreset_t* preset, fluid_synth_t* synth, int chan
               p = fluid_list_next(p);
             }
           }
-
-          
-
 #else
-
           for (i = 0; i < GEN_LAST; i++) {
 
             /* SF 2.01 section 9.4 'bullet' 4:
@@ -902,19 +898,6 @@ fluid_defpreset_noteon(fluid_defpreset_t* preset, fluid_synth_t* synth, int chan
             }
           }
           
-
-
-
-/*
-              fluid_gen_t *gen = fluid_gen_get(preset_zone->gen, i);
-              if (gen) {
-                fluid_voice_gen_incr(voice, i, gen->val);
-              } else if ((global_preset_zone != NULL)) {
-                fluid_gen_t *global_gen = fluid_gen_get(global_preset_zone->gen, i);
-                if (global_gen)
-                  fluid_voice_gen_incr(voice, i, global_gen->val);
-              }
-*/
 #else
 
           for (i = 0; i < GEN_LAST; i++) {
@@ -1203,15 +1186,16 @@ fluid_preset_zone_import_sfont(fluid_preset_zone_t* zone, SFZone *sfzone, fluid_
       break;
     default:
     #ifdef FLUID_NEW_GEN_API
-      gen=fluid_gen_get(zone->gen,sfgen->id);
-      if(!gen) {
-        gen=fluid_gen_create(sfgen->id);
-        zone->gen=fluid_list_append(zone->gen,gen);
+      if(fluid_gen_get_default_value(sfgen->id)!=(fluid_real_t) sfgen->amount.sword) {
+        gen=fluid_gen_get(zone->gen,sfgen->id);
+        if(!gen) {
+          gen=fluid_gen_create(sfgen->id);
+          zone->gen=fluid_list_append(zone->gen,gen);
+        }
+
+        gen->val=(fluid_real_t) sfgen->amount.sword;
+        gen->flags = GEN_SET;
       }
-
-      gen->val=(fluid_real_t) sfgen->amount.sword;
-      gen->flags = GEN_SET;
-
 
     #else
       /* FIXME: some generators have an unsigne word amount value but i don't know which ones */
@@ -1595,7 +1579,7 @@ delete_fluid_inst_zone(fluid_inst_zone_t* zone)
   gen = zone->gen;
   while (gen != NULL) {
     fluid_gen_t *tmp = (fluid_gen_t *)gen->data;
-    fluid_gen_delete(tmp);
+    FLUID_FREE(tmp);
     gen = fluid_list_next(gen);
   }
 #endif
@@ -1640,6 +1624,7 @@ fluid_inst_zone_import_sfont(fluid_inst_zone_t* zone, SFZone *sfzone, fluid_defs
       break;
     default:
 #ifdef FLUID_NEW_GEN_API
+      if(fluid_gen_get_default_value(sfgen->id)!=(fluid_real_t) sfgen->amount.sword) {
       gen=fluid_gen_get(zone->gen,sfgen->id);
       if(!gen) {
         gen=fluid_gen_create(sfgen->id);
@@ -1648,6 +1633,7 @@ fluid_inst_zone_import_sfont(fluid_inst_zone_t* zone, SFZone *sfzone, fluid_defs
   
       gen->val=(fluid_real_t) sfgen->amount.sword;
       gen->flags = GEN_SET;
+    }
 
 #else
       /* FIXME: some generators have an unsigned word amount value but
@@ -2807,47 +2793,47 @@ load_ibag (int size, SFData * sf, fluid_file fd)
   unsigned short genndx, modndx, pgenndx = 0, pmodndx = 0;
   int i;
 
-  if (size % SFBAGSIZE || size == 0)	/* size is multiple of SFBAGSIZE? */
+  if (size % SFBAGSIZE || size == 0)  /* size is multiple of SFBAGSIZE? */
     return (gerr (ErrCorr, _("Instrument bag chunk size is invalid")));
 
   p = sf->inst;
   while (p)
-    {				/* traverse through inst */
-      p2 = ((SFInst *) (p->data))->zone;
-      while (p2)
-	{			/* load this inst's zones */
-	  if ((size -= SFBAGSIZE) < 0)
-	    return (gerr (ErrCorr, _("Instrument bag chunk size mismatch")));
-	  z = FLUID_NEW (SFZone);
-	  p2->data = z;
-	  z->gen = NULL;	/* In case of failure, */
-	  z->mod = NULL;	/* sfont_close can clean up */
-	  READW (genndx, fd);	/* READW = possible read failure */
-	  READW (modndx, fd);
-	  z->instsamp = NULL;
+  { /* traverse through inst */
+    p2 = ((SFInst *) (p->data))->zone;
+    while (p2)
+    { /* load this inst's zones */
+      if ((size -= SFBAGSIZE) < 0)
+        return (gerr (ErrCorr, _("Instrument bag chunk size mismatch")));
+      z = FLUID_NEW (SFZone);
+      p2->data = z;
+      z->gen = NULL;  /* In case of failure, */
+      z->mod = NULL;  /* sfont_close can clean up */
+      READW (genndx, fd); /* READW = possible read failure */
+      READW (modndx, fd);
+      z->instsamp = NULL;
 
-	  if (pz)
-	    {			/* if not first zone */
-	      if (genndx < pgenndx)
-		return (gerr (ErrCorr,
-		    _("Instrument generator indices not monotonic")));
-	      if (modndx < pmodndx)
-		return (gerr (ErrCorr,
-		    _("Instrument modulator indices not monotonic")));
-	      i = genndx - pgenndx;
-	      while (i--)
-      		pz->gen = fluid_list_prepend (pz->gen, NULL);
-	      i = modndx - pmodndx;
-	      while (i--)
-		      pz->mod = fluid_list_prepend (pz->mod, NULL);
-	    }
-	  pz = z;		/* update previous zone ptr */
-	  pgenndx = genndx;
-	  pmodndx = modndx;
-	  p2 = fluid_list_next (p2);
-	}
-      p = fluid_list_next (p);
+      if (pz)
+      { /* if not first zone */
+        if (genndx < pgenndx)
+          return (gerr (ErrCorr,
+                        _("Instrument generator indices not monotonic")));
+        if (modndx < pmodndx)
+          return (gerr (ErrCorr,
+                        _("Instrument modulator indices not monotonic")));
+        i = genndx - pgenndx;
+        while (i--) 
+          pz->gen = fluid_list_prepend (pz->gen, NULL);
+        i = modndx - pmodndx;
+        while (i--)
+          pz->mod = fluid_list_prepend (pz->mod, NULL);
+      }
+      pz = z;   /* update previous zone ptr */
+      pgenndx = genndx;
+      pmodndx = modndx;
+      p2 = fluid_list_next (p2);
     }
+    p = fluid_list_next (p);
+  }
 
   size -= SFBAGSIZE;
   if (size != 0)
@@ -2857,15 +2843,15 @@ load_ibag (int size, SFData * sf, fluid_file fd)
   READW (modndx, fd);
 
   if (!pz)
-    {				/* in case that all are no zoners */
-      if (genndx > 0)
-	FLUID_LOG (FLUID_WARN,
-	  _("No instrument generators and terminal index not 0"));
-      if (modndx > 0)
-	FLUID_LOG (FLUID_WARN,
-	  _("No instrument modulators and terminal index not 0"));
-      return (OK);
-    }
+  { /* in case that all are no zoners */
+    if (genndx > 0)
+      FLUID_LOG (FLUID_WARN,
+                 _("No instrument generators and terminal index not 0"));
+    if (modndx > 0)
+      FLUID_LOG (FLUID_WARN,
+                 _("No instrument modulators and terminal index not 0"));
+    return (OK);
+  }
 
   if (genndx < pgenndx)
     return (gerr (ErrCorr, _("Instrument generator indices not monotonic")));
@@ -3350,12 +3336,11 @@ sfont_free_zone (SFZone * zone)
 
   if (!zone)
     return;
-
   p = zone->gen;
   while (p)
     {				/* Free gen chunks for this zone */
       if (p->data)
-	FLUID_FREE (p->data);
+      	FLUID_FREE (p->data);
       p = fluid_list_next (p);
     }
   delete_fluid_list (zone->gen);	/* free genlist */
