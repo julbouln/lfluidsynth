@@ -1988,7 +1988,6 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
    }
   }
 
-#if 0
   /* if multi channel output, don't mix the output of the chorus and
      reverb in the final output. The effects outputs are send
      separately. */
@@ -2037,7 +2036,7 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
 
     }
   }
-#endif
+
   synth->ticks += FLUID_BUFSIZE;
 
 #ifdef FLUID_SAMPLE_GC

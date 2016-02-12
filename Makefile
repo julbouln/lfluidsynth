@@ -2,12 +2,10 @@ FLUIDSYNTH_OBJS=$(patsubst %.c,%.o,$(wildcard src/*.c))
 # fluidsynth/drivers/fluid_alsa.o fluidsynth/drivers/fluid_pulse.o
 CFLAGS=-O3 -g -I. -Isrc
 CFLAGS+= -DFLUID_SAMPLE_FORMAT_FLOAT -DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC -DFLUID_SAMPLE_READ_CHUNK -DFLUID_NEW_GEN_API -DFLUID_NEW_VOICE_MOD_API
+#CFLAGS      += -DFLUID_ARM_OPT 
 #CFLAGS+=-march=native
 #CFLAGS+=-ftree-vectorize -ffast-math -fsingle-precision-constant
 SYNTH_CFLAGS=-Irt -D__LINUX_ALSA__ 
-#-D__LINUX_PULSE__ 
-# -DALSA_SUPPORT -DPULSE_SUPPORT 
-#-DPULSE_SUPPORT -DFLUID_ENABLE_THREAD
 
 # for massif and callgrind
 SF2_PROF_FILE=merlin.sf2
@@ -27,7 +25,7 @@ test: timgm6mb.sf2 $(FLUIDSYNTH_OBJS)
 	gcc $(CFLAGS) test.c -o test $(FLUIDSYNTH_OBJS) -lc -lm
 
 callgrind: synth
-	pasuspender -- valgrind --dsymutil=yes --tool=callgrind ./synth $(SF2_PROF_FILE)
+	pasuspender -- valgrind --dsymutil=yes --tool=callgrind --dump-instr=yes --collect-jumps=yes ./synth $(SF2_PROF_FILE)
 
 massif: synth
 	pasuspender -- valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./synth $(SF2_PROF_FILE)
