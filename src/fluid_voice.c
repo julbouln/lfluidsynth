@@ -103,6 +103,8 @@ new_fluid_voice(fluid_real_t output_rate)
   voice->modenv_data[FLUID_VOICE_ENVFINISHED].min = -1.0f;
   voice->modenv_data[FLUID_VOICE_ENVFINISHED].max = 1.0f;
 
+  voice->mod=NULL;
+
   return voice;
 }
 
@@ -115,16 +117,6 @@ delete_fluid_voice(fluid_voice_t* voice)
   if (voice == NULL) {
     return FLUID_OK;
   }
-
-#ifdef FLUID_NEW_VOICE_MOD_API
-  fluid_list_t *p;
-  p = voice->mod;
-  while (p != NULL) {
-      fluid_mod_t *tmp = (fluid_mod_t *) p->data;
-      FLUID_FREE(tmp);
-      p = fluid_list_next(p);
-  }
-#endif
 
   FLUID_FREE(voice);
   return FLUID_OK;
@@ -210,6 +202,7 @@ fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
   fluid_sample_incr_ref(voice->sample);
 
 #ifdef FLUID_NEW_VOICE_MOD_API
+  delete_fluid_list(voice->mod);
   voice->mod=NULL;
 #endif
   
