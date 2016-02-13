@@ -1784,13 +1784,12 @@ fluid_synth_write_s16(fluid_synth_t* synth, int len,
                       void* rout, int roff, int rincr)
 {
   int i, j, k, l;
-  signed short* left_out = (signed short*) lout;
-  signed short* right_out = (signed short*) rout;
+  int16_t* left_out = (int16_t*) lout;
+  int16_t* right_out = (int16_t*) rout;
   fluid_real_t* left_in = synth->left_buf[0];
   fluid_real_t* right_in = synth->right_buf[0];
   fluid_real_t left_sample;
   fluid_real_t right_sample;
-  double time = fluid_utime();
 
   /* make sure we're playing */
   if (synth->state != FLUID_SYNTH_PLAYING) {
@@ -1811,13 +1810,13 @@ fluid_synth_write_s16(fluid_synth_t* synth, int len,
     right_sample =  (right_in[l] * 32766.0f);
 
     /* digital clipping */
-/*    if (left_sample > 32767.0f) left_sample = 32767.0f;
+    if (left_sample > 32767.0f) left_sample = 32767.0f;
     if (left_sample < -32768.0f) left_sample = -32768.0f;
     if (right_sample > 32767.0f) right_sample = 32767.0f;
     if (right_sample < -32768.0f) right_sample = -32768.0f;
-*/
-    left_out[j] = (signed short) left_sample;
-    right_out[k] = (signed short) right_sample;
+
+    left_out[j] = (int16_t) left_sample;
+    right_out[k] = (int16_t) right_sample;
   }
 
   synth->cur = l;
@@ -1858,11 +1857,11 @@ fluid_synth_write_s32(fluid_synth_t* synth, int len,
     right_sample =  (right_in[l] * 2147483646.0f);
 
     /* digital clipping */
-/*    if (left_sample > 2147483647.0f) left_sample = 2147483647.0f;
+    if (left_sample > 2147483647.0f) left_sample = 2147483647.0f;
     if (left_sample < -2147483647.0f) left_sample = -2147483647.0f;
     if (right_sample > 2147483647.0f) right_sample = 2147483647.0f;
     if (right_sample < -2147483647.0f) right_sample = -2147483647.0f;
-*/
+
 
     left_out[j] = (int32_t) left_sample;
     right_out[k] = (int32_t) right_sample;
@@ -2039,10 +2038,11 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
 
   synth->ticks += FLUID_BUFSIZE;
 
+/*
 #ifdef FLUID_SAMPLE_GC
  fluid_synth_sampledata_clean(synth);
 #endif
-
+*/
   return 0;
 }
 
