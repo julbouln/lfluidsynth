@@ -495,7 +495,7 @@ struct _fluid_defsfont_t
 
 void fluid_sampledata_reset(fluid_sampledata_t *);
 void fluid_sampledata_init(fluid_sampledata_t *, fluid_file);
-void fluid_sampledata_read_chunk(fluid_sampledata_t *, uint32_t, uint32_t);
+//void fluid_sampledata_read_chunk(fluid_sampledata_t *, uint32_t, uint32_t);
 void fluid_sampledata_read(fluid_sampledata_t *, uint32_t, uint32_t, uint32_t, uint32_t);
 void fluid_sampledata_clean(fluid_sfont_t* sfont, uint32_t);
 

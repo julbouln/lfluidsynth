@@ -103,7 +103,9 @@ new_fluid_voice(fluid_real_t output_rate)
   voice->modenv_data[FLUID_VOICE_ENVFINISHED].min = -1.0f;
   voice->modenv_data[FLUID_VOICE_ENVFINISHED].max = 1.0f;
 
-  voice->mod=NULL;
+#ifdef FLUID_NEW_VOICE_MOD_API
+  voice->mod = NULL;
+#endif
 
   return voice;
 }
@@ -154,10 +156,14 @@ fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
   voice->volenv_count = 0;
   voice->volenv_section = 0;
   voice->volenv_val = 0.0f;
+
+#ifdef FLUID_BUFFER_S16
+  voice->amp = 0;
+#else
   voice->amp = 0.0f; /* The last value of the volume envelope, used to
                         calculate the volume increment during
                         processing */
-
+#endif
   /* mod env initialization*/
   voice->modenv_count = 0;
   voice->modenv_section = 0;
@@ -201,11 +207,20 @@ fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
      unloading of the soundfont while this voice is playing. */
   fluid_sample_incr_ref(voice->sample);
 
+
 #ifdef FLUID_NEW_VOICE_MOD_API
+  fluid_list_t *p;
+  p = voice->mod;
+  while (p != NULL) {
+    fluid_mod_t *tmpmod = (fluid_mod_t *) p->data;
+    FLUID_FREE(tmpmod);
+    p->data = NULL;
+    p = fluid_list_next(p);
+  }
   delete_fluid_list(voice->mod);
-  voice->mod=NULL;
+  voice->mod = NULL;
 #endif
-  
+
   return FLUID_OK;
 }
 
@@ -420,19 +435,23 @@ int fluid_voice_calc_amp(fluid_voice_t *voice) {
   }
 
   /* Volume increment to go from voice->amp to target_amp in FLUID_BUFSIZE steps */
-  voice->amp_incr = (target_amp - voice->amp) / FLUID_BUFSIZE;
+  voice->amp_incr = (FLUID_REAL_TO_FACT(target_amp) - voice->amp) / FLUID_BUFSIZE;
 
   /* no volume and not changing? - No need to process */
+#ifdef FLUID_BUFFER_S16
+  if ((voice->amp == 0) && (voice->amp_incr == 0))
+    return 1;
+#else
   if ((voice->amp == 0.0f) && (voice->amp_incr == 0.0f))
     return 1;
-
+#endif
   /* Calculate the number of samples, that the DSP loop advances
    * through the original waveform with each step in the output
    * buffer. It is the ratio between the frequencies of original
    * waveform and output waveform.*/
-  voice->phase_incr = fluid_ct2hz_real(voice->pitch + voice->modlfo_val * voice->modlfo_to_pitch
-                       + voice->viblfo_val * voice->viblfo_to_pitch
-                       + voice->modenv_val * voice->modenv_to_pitch) / voice->root_pitch;
+  voice->phase_incr = (uint64_t)(fluid_ct2hz_real(voice->pitch + voice->modlfo_val * voice->modlfo_to_pitch
+                                 + voice->viblfo_val * voice->viblfo_to_pitch
+                                 + voice->modenv_val * voice->modenv_to_pitch) / voice->root_pitch * 4294967296.0f);
 
   /* if phase_incr is not advancing, set it to the minimum fraction value (prevent stuckage) */
   if (voice->phase_incr == 0) voice->phase_incr = 1;
@@ -564,7 +583,7 @@ void fluid_voice_filters(fluid_voice_t *voice, int count) {
   int dsp_filter_coeff_incr_count = voice->filter_coeff_incr_count;
   fluid_real_t dsp_centernode;
 
-  fluid_real_t *dsp_buf = voice->dsp_buf;
+  fluid_buf_t *dsp_buf = voice->dsp_buf;
   int dsp_i;
 
   /* filter (implement the voice filter according to SoundFont standard) */
@@ -683,257 +702,18 @@ void fluid_dsp_float_config (void)
 
 }
 
-// one calculate function including interpolation and effects
-int
-fluid_voice_calc(fluid_voice_t *voice,
-                     fluid_real_t* dsp_left_buf, fluid_real_t* dsp_right_buf,
-                     fluid_real_t* dsp_reverb_buf, fluid_real_t* dsp_chorus_buf)
+// TODO
+int fluid_voice_calc_effects(fluid_voice_t *voice,
+                 fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf, uint16_t cnt)
 {
-  fluid_phase_t dsp_phase = voice->phase;
-  fluid_phase_t dsp_phase_incr, end_phase;
-  fluid_sampledata *dsp_data = voice->sample->data;
-  fluid_real_t *dsp_buf = voice->dsp_buf;
-  fluid_real_t dsp_amp = voice->amp;
-  fluid_real_t dsp_amp_incr = voice->amp_incr;
-  fluid_real_t amp_left = voice->amp_left;
-  fluid_real_t amp_right = voice->amp_right;
+  fluid_buf_t amp_reverb = FLUID_REAL_TO_FACT(voice->amp_reverb);
+  fluid_buf_t amp_chorus = FLUID_REAL_TO_FACT(voice->amp_chorus);
 
-  uint32_t dsp_i;
-  uint32_t dsp_phase_index;
-  uint32_t end_index;
-  uint8_t looping;
-  uint64_t loop_size;
-
-  uint32_t index_incr,fract_incr;
-
-#ifdef FLUID_SAMPLE_READ_DISK
-  short *buf=dsp_data->buf - voice->start;
-#else
-  short *buf=dsp_data;
+#ifndef FLUID_BUFFER_S16
+  amp_reverb = amp_reverb / 32768.0f;
+  amp_chorus = amp_chorus / 32768.0f;
 #endif
 
-  index_incr=(uint32_t)voice->phase_incr;
-  fract_incr=(uint32_t)((voice->phase_incr - (fluid_real_t)index_incr)*4294967296);
-  dsp_phase_incr = ((uint64_t)index_incr << 32) + fract_incr;
-
-  looping = voice->is_looping;
-  end_index = looping ? voice->loopend - 1 : voice->end;
-  loop_size = (uint64_t)(voice->loopend - voice->loopstart) << 32;
-
-  fluid_real_t in;
-
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR
-  fluid_real_t *coeffs;
-#endif
-
-#ifdef FLUID_ARM_OPT
-#if 0
-  uint32_t blkCnt;                               /* loop counter */
-
-  /* Run the below code for Cortex-M4 and Cortex-M3 */
-  fluid_real_t in1, in2, in3, in4;                  /* temporary variabels */
-
-  /*loop Unrolling */
-  blkCnt = FLUID_BUFSIZE >> 2u;
-
-    while (blkCnt > 0u)
-    {
-      dsp_phase_index = dsp_phase >> 32;
-
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR
-      coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)];
-      in1 = *(buf + dsp_phase_index) * coeffs[0] + *(buf + dsp_phase_index + 1) * coeffs[1];
-#else
-      in1 = *(buf + dsp_phase_index);
-#endif
-
-      dsp_phase += dsp_phase_incr;
-      dsp_phase_index = dsp_phase >> 32;
-
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR
-      coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)];
-      in2 = *(buf + dsp_phase_index) * coeffs[0] + *(buf + dsp_phase_index + 1) * coeffs[1];
-#else
-      in2 = *(buf + dsp_phase_index);
-#endif      
-
-      dsp_phase += dsp_phase_incr;
-      dsp_phase_index = dsp_phase >> 32;
-
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR
-      coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)];
-      in3 = *(buf + dsp_phase_index) * coeffs[0] + *(buf + dsp_phase_index + 1) * coeffs[1];
-#else
-      in3 = *(buf + dsp_phase_index);
-#endif
-
-      dsp_phase += dsp_phase_incr;
-      dsp_phase_index = dsp_phase >> 32;
-
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR
-      coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)];
-      in4 = *(buf + dsp_phase_index) * coeffs[0] + *(buf + dsp_phase_index + 1) * coeffs[1];
-#else
-      in4 = *(buf + dsp_phase_index);
-#endif
-
-      /* multiply with scaling factor */
-      in1 = in1 * dsp_amp;
-      in2 = in2 * dsp_amp;
-      in3 = in3 * dsp_amp;
-      in4 = in4 * dsp_amp;
-
-      // store left and right channels
-      *dsp_left_buf++ += (in1 * amp_left);
-      *dsp_left_buf++ += (in2 * amp_left);
-      *dsp_left_buf++ += (in3 * amp_left);
-      *dsp_left_buf++ += (in4 * amp_left);
-
-      *dsp_right_buf++ += (in1 * amp_right);
-      *dsp_right_buf++ += (in2 * amp_right);
-      *dsp_right_buf++ += (in3 * amp_right);
-      *dsp_right_buf++ += (in4 * amp_right);
-
-      /* increment phase and amplitude */
-      dsp_phase += dsp_phase_incr;
-      dsp_amp += dsp_amp_incr;
-
-      if (((dsp_phase + 4) >> 32) > end_index)
-        {
-        if(looping) 
-        {
-          dsp_phase -= loop_size;
-          voice->has_looped = 1;
-        } else {          
-          break;
-        }
-      }
-
-      blkCnt--;
-    }
-
-    dsp_i = (FLUID_BUFSIZE - blkCnt * 4);
-#else
-
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR 
-#define __INTERPOLATE(i) \
-      coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)]; \
-      in ## i = *(buf + dsp_phase_index) * coeffs[0] + *(buf + dsp_phase_index + 1) * coeffs[1];
-      dsp_phase += dsp_phase_incr; \
-      dsp_phase_index = dsp_phase >> 32;
-#else
-#define __INTERPOLATE(i) \
-      in ## i = *(buf + dsp_phase_index); \
-      dsp_phase += dsp_phase_incr; \
-      dsp_phase_index = dsp_phase >> 32;
-#endif
-
-#define __AMP(i) \
-      in ## i = in ## i * dsp_amp;
-
-#define __STEREO(i) \
-    *dsp_left_buf++ += (amp_left * in ## i); \
-    *dsp_right_buf++ += (amp_right * in ## i);
-
-#define __REVERB(i) \
-      *dsp_reverb_buf++ += voice->amp_reverb * in ## i;
-
-#define __CHORUS(i) \
-      *dsp_chorus_buf++ += voice->amp_chorus * in ## i;
-
- uint32_t blkCnt;                               /* loop counter */
-
-  /* Run the below code for Cortex-M4 and Cortex-M3 */
-  fluid_real_t in0, in1, in2, in3;                  /* temporary variabels */
-
-  /*loop Unrolling */
-  blkCnt = FLUID_BUFSIZE >> 2;
-
-    while (blkCnt != 0)
-    {
-      dsp_phase_index = dsp_phase >> 32;
-
-      __INTERPOLATE(0)
-      __INTERPOLATE(1)
-      __INTERPOLATE(2)
-      __INTERPOLATE(3)
-
-      /* increment phase and amplitude */
-//      dsp_phase += dsp_phase_incr;
-      dsp_amp += dsp_amp_incr;
-
-      /* multiply with scaling factor */
-      __AMP(0)
-      __AMP(1)
-      __AMP(2)
-      __AMP(3)
-
-/*
-    __REVERB(0)
-    __REVERB(1)
-    __REVERB(2)
-    __REVERB(3)
-
-    __CHORUS(0)
-    __CHORUS(1)
-    __CHORUS(2)
-    __CHORUS(3)
-    */
-
-    __STEREO(0)
-    __STEREO(1)
-    __STEREO(2)
-    __STEREO(3)    
-
-      if (((dsp_phase + 4) >> 32) > end_index)
-        {
-        if(looping) 
-        {
-          dsp_phase -= loop_size;
-          voice->has_looped = 1;
-        } else {          
-          break;
-        }
-      }
-      dsp_i+=4;
-      blkCnt--;
-    }
-
-  dsp_i = (FLUID_BUFSIZE - blkCnt * 4);
-#endif
-#else
-
-  for (dsp_i = 0 ; dsp_i < FLUID_BUFSIZE; dsp_i++)
-    {
-      dsp_phase_index = dsp_phase >> 32;
-      // interpolation
-#ifdef FLUID_CALC_INTERPOLATE_LINEAR
-        coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)];
-        in = dsp_amp * (buf[dsp_phase_index] * coeffs[0] + buf[dsp_phase_index] * coeffs[1]);
-#else
-        in = dsp_amp * buf[dsp_phase_index];
-#endif
-
-      dsp_left_buf[dsp_i] += (amp_left * in);
-      dsp_right_buf[dsp_i] += (amp_right * in);
-
-      /* increment phase and amplitude */
-      dsp_phase += dsp_phase_incr;
-      dsp_amp += dsp_amp_incr;
-
-      if (((dsp_phase + 4) >> 32) > end_index)
-        {
-        if(looping) 
-        {
-          dsp_phase -= loop_size;
-          voice->has_looped = 1;
-        } else {          
-          break;
-        }
-      }
-
-    }
-#endif
 
 #if 0
 
@@ -951,10 +731,156 @@ fluid_voice_calc(fluid_voice_t *voice,
       dsp_chorus_buf[dsp_i] += voice->amp_chorus * dsp_buf[dsp_i];
   }
 #endif
+  return cnt;
+}
 
-voice->phase = dsp_phase;
-    voice->amp = dsp_amp;
-    return dsp_i;
+uint32_t fluid_voice_calc_stereo(fluid_voice_t *voice,
+                 fluid_buf_t* dsp_left_buf, fluid_buf_t* dsp_right_buf, uint32_t cnt)
+{
+    fluid_buf_t *dsp_buf = voice->dsp_buf;
+  fluid_buf_t amp_left = FLUID_REAL_TO_FACT(voice->amp_left);
+  fluid_buf_t amp_right = FLUID_REAL_TO_FACT(voice->amp_right);
+
+  uint32_t dsp_cnt;
+  fluid_buf_t in0,in1,in2,in3;
+
+#ifndef FLUID_BUFFER_S16
+  amp_left = amp_left / 32768.0f;
+  amp_right = amp_right / 32768.0f;
+
+#endif
+
+
+  dsp_cnt = (cnt >> 2);
+
+  while (dsp_cnt > 0)
+  {
+//    __asm("BKPT 5");
+
+    in0=*(dsp_buf++);
+    in1=*(dsp_buf++);
+    in2=*(dsp_buf++);
+    in3=*(dsp_buf++);
+    
+    *(dsp_left_buf) = FLUID_BUF_MAC(amp_left,in0,*(dsp_left_buf));
+    *(dsp_left_buf)++;
+    *(dsp_left_buf) = FLUID_BUF_MAC(amp_left,in1,*(dsp_left_buf));
+    *(dsp_left_buf)++;
+    *(dsp_left_buf) = FLUID_BUF_MAC(amp_left,in2,*(dsp_left_buf));
+    *(dsp_left_buf)++;
+    *(dsp_left_buf) = FLUID_BUF_MAC(amp_left,in3,*(dsp_left_buf));
+    *(dsp_left_buf)++;
+
+    *(dsp_right_buf) = FLUID_BUF_MAC(amp_right,in0,*(dsp_right_buf));
+    *(dsp_right_buf)++;
+    *(dsp_right_buf) = FLUID_BUF_MAC(amp_right,in1,*(dsp_right_buf));
+    *(dsp_right_buf)++;
+    *(dsp_right_buf) = FLUID_BUF_MAC(amp_right,in2,*(dsp_right_buf));
+    *(dsp_right_buf)++;
+    *(dsp_right_buf) = FLUID_BUF_MAC(amp_right,in3,*(dsp_right_buf));
+    *(dsp_right_buf)++;
+
+    dsp_cnt--;
+//    __asm("BKPT 6");
+  }
+  return cnt;
+}
+
+// one calculate function including interpolation and effects
+uint32_t
+fluid_voice_calc(fluid_voice_t *voice)
+//                 fluid_buf_t* dsp_left_buf, fluid_buf_t* dsp_right_buf,
+//                 fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf)
+{
+  fluid_phase_t dsp_phase = voice->phase;
+  fluid_phase_t dsp_phase_incr = voice->phase_incr;
+//  fluid_sampledata *dsp_data = voice->sample->data;
+  fluid_buf_t *dsp_buf = voice->dsp_buf;
+  fluid_buf_t dsp_amp = voice->amp;
+  fluid_buf_t dsp_amp_incr = voice->amp_incr;
+
+  //uint16_t dsp_i;
+  uint32_t dsp_cnt;
+  uint32_t dsp_phase_index;
+  uint32_t end_index = voice->end_index;
+  uint64_t loop_size = voice->loop_size;
+  int32_t in0,in1,in2,in3;
+
+#ifdef FLUID_SAMPLE_READ_DISK
+  int16_t *buf = voice->sample->data->buf - voice->start;
+#else
+  int16_t *buf = voice->sample->data;
+#endif
+
+#ifdef FLUID_CALC_INTERPOLATE_LINEAR
+  fluid_real_t *coeffs;
+#endif
+
+  /*
+  #ifdef FLUID_CALC_INTERPOLATE_LINEAR
+  #define __INTERPOLATE(i) \
+        coeffs = interp_coeff_linear[fluid_phase_fract_to_tablerow (dsp_phase)]; \
+        in ## i = *(buf + dsp_phase_index) * coeffs[0] + *(buf + dsp_phase_index + 1) * coeffs[1]; \
+        dsp_phase += dsp_phase_incr; \
+        dsp_phase_index = dsp_phase >> 32;
+  #end */
+
+  /*loop Unrolling */
+  dsp_cnt = FLUID_BUFSIZE >> 2;
+
+  dsp_phase_index = dsp_phase >> 32;
+
+  while (dsp_cnt > 0)
+  {
+//    __asm("BKPT 1");
+
+
+      in0 = FLUID_BUF_SAMPLE(*(buf + dsp_phase_index));
+      dsp_phase += dsp_phase_incr;
+      dsp_phase_index = dsp_phase >> 32;
+      in1 = FLUID_BUF_SAMPLE(*(buf + dsp_phase_index));
+      dsp_phase += dsp_phase_incr;
+      dsp_phase_index = dsp_phase >> 32;
+      in2 = FLUID_BUF_SAMPLE(*(buf + dsp_phase_index));
+      dsp_phase += dsp_phase_incr;
+      dsp_phase_index = dsp_phase >> 32;
+      in3 = FLUID_BUF_SAMPLE(*(buf + dsp_phase_index));
+      dsp_phase += dsp_phase_incr;
+      dsp_phase_index = dsp_phase >> 32;
+
+      dsp_amp += dsp_amp_incr;
+      in0 = FLUID_BUF_MULT(dsp_amp,in0);
+      dsp_amp += dsp_amp_incr;
+      in1 = FLUID_BUF_MULT(dsp_amp,in1);
+      dsp_amp += dsp_amp_incr;
+      in2 = FLUID_BUF_MULT(dsp_amp,in2);
+      dsp_amp += dsp_amp_incr;
+      in3 = FLUID_BUF_MULT(dsp_amp,in3);
+
+      *(dsp_buf++) = in0;
+      *(dsp_buf++) = in1;
+      *(dsp_buf++) = in2;
+      *(dsp_buf++) = in3;
+
+    if (dsp_phase_index > end_index)
+    {
+      if (voice->is_looping)
+      {
+        dsp_phase -= loop_size;
+        voice->has_looped = 1;
+      } else {
+        break;
+      }
+    }
+    
+    dsp_cnt--;
+//    __asm("BKPT 2");
+  }
+
+
+  voice->phase = dsp_phase;
+  voice->amp = dsp_amp;
+  return (FLUID_BUFSIZE - (dsp_cnt << 2));
 }
 
 /*
@@ -970,8 +896,8 @@ voice->phase = dsp_phase;
  */
 int
 fluid_voice_write(fluid_voice_t* voice,
-                  fluid_real_t* dsp_left_buf, fluid_real_t* dsp_right_buf,
-                  fluid_real_t* dsp_reverb_buf, fluid_real_t* dsp_chorus_buf)
+                  fluid_buf_t* dsp_left_buf, fluid_buf_t* dsp_right_buf,
+                  fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf)
 {
   if (voice->sample == NULL)
   {
@@ -986,11 +912,11 @@ fluid_voice_write(fluid_voice_t* voice,
 
   unsigned int i;
   fluid_real_t incr;
-  int count;
+  uint32_t count;
 
-  int dsp_interp_method = voice->interp_method;
+//  int dsp_interp_method = voice->interp_method;
 
-  fluid_real_t dsp_buf[FLUID_BUFSIZE];
+  fluid_buf_t dsp_buf[FLUID_BUFSIZE];
 
   /******************* sample **********************/
 
@@ -1021,7 +947,7 @@ fluid_voice_write(fluid_voice_t* voice,
   voice->dsp_buf = dsp_buf;
 
 #ifdef FLUID_SAMPLE_READ_DISK
-  uint32_t sample_index=(voice->phase >> 32) - voice->start;
+  uint32_t sample_index = (voice->phase >> 32) - voice->start;
   fluid_sampledata_read(voice->sample->data, voice->start, voice->end, sample_index, FLUID_SAMPLE_READ_CHUNK_SIZE);
 #endif
 
@@ -1030,8 +956,20 @@ fluid_voice_write(fluid_voice_t* voice,
                       || (_SAMPLEMODE (voice) == FLUID_LOOP_UNTIL_RELEASE
                           && voice->volenv_section < FLUID_VOICE_ENVRELEASE);
 
-  count=fluid_voice_calc(voice, dsp_left_buf, dsp_right_buf,
-                         dsp_reverb_buf, dsp_chorus_buf);
+
+  if (voice->is_looping) {
+    voice->end_index = voice->loopend;
+    voice->loop_size = (uint64_t)(voice->loopend - voice->loopstart) << 32;
+  }
+  else {
+    voice->end_index = voice->end;
+    voice->loop_size = 0;
+  }
+
+  count = fluid_voice_calc(voice);
+
+  fluid_voice_calc_stereo(voice, dsp_left_buf, dsp_right_buf, count);
+//  fluid_voice_calc_effects(voice,dsp_reverb_buf, dsp_chorus_buf);
 
   /* turn off voice if short count (sample ended and not looping) */
   if (count < FLUID_BUFSIZE)
@@ -1192,8 +1130,8 @@ fluid_voice_calculate_runtime_synthesis_parameters(fluid_voice_t* voice)
   if (fluid_channel_has_tuning(voice->channel)) {
     /* pitch(60) + scale * (pitch(key) - pitch(60)) */
     fluid_tuning_t* tuning = fluid_channel_get_tuning(voice->channel);
-    voice->gen[GEN_PITCH].val = (fluid_tuning_get_pitch(tuning,60) + (voice->gen[GEN_SCALETUNE].val / 100.0f *
-                                 (fluid_tuning_get_pitch(tuning,voice->key) - fluid_tuning_get_pitch(tuning,60))));
+    voice->gen[GEN_PITCH].val = (fluid_tuning_get_pitch(tuning, 60) + (voice->gen[GEN_SCALETUNE].val / 100.0f *
+                                 (fluid_tuning_get_pitch(tuning, voice->key) - fluid_tuning_get_pitch(tuning, 60))));
   } else {
     voice->gen[GEN_PITCH].val = (voice->gen[GEN_SCALETUNE].val * (voice->key - 60.0f)
                                  + 100.0f * 60.0f);
@@ -1319,8 +1257,10 @@ fluid_voice_update_param(fluid_voice_t* voice, int gen)
   case GEN_PAN:
     /* range checking is done in the fluid_pan function */
     voice->pan = _GEN(voice, GEN_PAN);
-    voice->amp_left = fluid_pan(voice->pan, 1) * voice->synth_gain / 32768.0f;
-    voice->amp_right = fluid_pan(voice->pan, 0) * voice->synth_gain / 32768.0f;
+//    voice->amp_left = fluid_pan(voice->pan, 1) * voice->synth_gain / 32768.0f;
+//    voice->amp_right = fluid_pan(voice->pan, 0) * voice->synth_gain / 32768.0f;
+    voice->amp_left = fluid_pan(voice->pan, 1) * voice->synth_gain;
+    voice->amp_right = fluid_pan(voice->pan, 0) * voice->synth_gain;
     break;
 
   case GEN_ATTENUATION:
@@ -1349,14 +1289,16 @@ fluid_voice_update_param(fluid_voice_t* voice, int gen)
     /* The generator unit is 'tenths of a percent'. */
     voice->reverb_send = _GEN(voice, GEN_REVERBSEND) / 1000.0f;
     fluid_clip(voice->reverb_send, 0.0, 1.0);
-    voice->amp_reverb = voice->reverb_send * voice->synth_gain / 32768.0f;
+//    voice->amp_reverb = voice->reverb_send * voice->synth_gain / 32768.0f;
+    voice->amp_reverb = voice->reverb_send * voice->synth_gain;
     break;
 
   case GEN_CHORUSSEND:
     /* The generator unit is 'tenths of a percent'. */
     voice->chorus_send = _GEN(voice, GEN_CHORUSSEND) / 1000.0f;
     fluid_clip(voice->chorus_send, 0.0, 1.0);
-    voice->amp_chorus = voice->chorus_send * voice->synth_gain / 32768.0f;
+//    voice->amp_chorus = voice->chorus_send * voice->synth_gain / 32768.0f;
+    voice->amp_chorus = voice->chorus_send * voice->synth_gain;
     break;
 
   case GEN_OVERRIDEROOTKEY:
@@ -1847,7 +1789,7 @@ int fluid_voice_modulate_all(fluid_voice_t* voice)
     /* Accumulate the modulation values of all the modulators with
      * destination generator 'gen' */
     while (p2 != NULL) {
-      fluid_mod_t *lmod=(fluid_mod_t *) p2->data;
+      fluid_mod_t *lmod = (fluid_mod_t *) p2->data;
       if (fluid_mod_has_dest(lmod, gen)) {
         modval += fluid_mod_get_value(lmod, voice->channel, voice);
       }
@@ -1996,7 +1938,6 @@ fluid_voice_off(fluid_voice_t* voice)
     voice->sample = NULL;
   }
 
-
   return FLUID_OK;
 }
 
@@ -2035,22 +1976,22 @@ fluid_voice_add_mod(fluid_voice_t* voice, fluid_mod_t* mod, int mode)
   }
 
 #ifdef FLUID_NEW_VOICE_MOD_API
-  fluid_mod_t* cmod=NULL;
+  fluid_mod_t* cmod = NULL;
   fluid_list_t *p;
   p = voice->mod;
   while (p != NULL) {
-      fluid_mod_t *lmod = (fluid_mod_t *) p->data;
-      if (fluid_mod_test_identity(lmod, mod)) {
-        cmod=lmod;
-        break;
-      }
-      p = fluid_list_next(p);
+    fluid_mod_t *lmod = (fluid_mod_t *) p->data;
+    if (fluid_mod_test_identity(lmod, mod)) {
+      cmod = lmod;
+      break;
+    }
+    p = fluid_list_next(p);
   }
 
-  if(!cmod) {
-    cmod=FLUID_NEW(fluid_mod_t);
+  if (!cmod) {
+    cmod = FLUID_NEW(fluid_mod_t);
     fluid_mod_clone(cmod, mod);
-    voice->mod=fluid_list_append(voice->mod,cmod);
+    voice->mod = fluid_list_append(voice->mod, cmod);
   }
 
   if (mode == FLUID_VOICE_ADD) {
@@ -2118,7 +2059,7 @@ fluid_real_t fluid_voice_get_lower_boundary_for_attenuation(fluid_voice_t* voice
   fluid_mod_t* mod;
   fluid_real_t possible_att_reduction_cB = 0;
   fluid_real_t lower_bound;
-  #ifdef FLUID_NEW_VOICE_MOD_API
+#ifdef FLUID_NEW_VOICE_MOD_API
   fluid_list_t *p;
   p = voice->mod;
   while (p != NULL) {
@@ -2126,15 +2067,15 @@ fluid_real_t fluid_voice_get_lower_boundary_for_attenuation(fluid_voice_t* voice
 
     /* Modulator has attenuation as target and can change over time? */
     if ((mod->dest == GEN_ATTENUATION)
-    && ((mod->flags1 & FLUID_MOD_CC) || (mod->flags2 & FLUID_MOD_CC))) {
+        && ((mod->flags1 & FLUID_MOD_CC) || (mod->flags2 & FLUID_MOD_CC))) {
 
       fluid_real_t current_val = fluid_mod_get_value(mod, voice->channel, voice);
       fluid_real_t v = FLUID_ABS(mod->amount);
 
       if ((mod->src1 == FLUID_MOD_PITCHWHEEL)
-      || (mod->flags1 & FLUID_MOD_BIPOLAR)
-      || (mod->flags2 & FLUID_MOD_BIPOLAR)
-      || (mod->amount < 0)) {
+          || (mod->flags1 & FLUID_MOD_BIPOLAR)
+          || (mod->flags2 & FLUID_MOD_BIPOLAR)
+          || (mod->amount < 0)) {
         /* Can this modulator produce a negative contribution? */
         v *= -1.0;
       } else {
@@ -2185,7 +2126,7 @@ fluid_real_t fluid_voice_get_lower_boundary_for_attenuation(fluid_voice_t* voice
       }
     }
   }
-  #endif
+#endif
 
   lower_bound = voice->attenuation - possible_att_reduction_cB;
 
@@ -2356,10 +2297,15 @@ int fluid_voice_set_gain(fluid_voice_t* voice, fluid_real_t gain)
   }
 
   voice->synth_gain = gain;
-  voice->amp_left = fluid_pan(voice->pan, 1) * gain / 32768.0f;
-  voice->amp_right = fluid_pan(voice->pan, 0) * gain / 32768.0f;
-  voice->amp_reverb = voice->reverb_send * gain / 32768.0f;
-  voice->amp_chorus = voice->chorus_send * gain / 32768.0f;
+//  voice->amp_left = fluid_pan(voice->pan, 1) * gain / 32768.0f;
+//  voice->amp_right = fluid_pan(voice->pan, 0) * gain / 32768.0f;
+  voice->amp_left = fluid_pan(voice->pan, 1) * gain;
+  voice->amp_right = fluid_pan(voice->pan, 0) * gain;
+
+//  voice->amp_reverb = voice->reverb_send * gain / 32768.0f;
+//  voice->amp_chorus = voice->chorus_send * gain / 32768.0f;
+  voice->amp_reverb = voice->reverb_send * gain;
+  voice->amp_chorus = voice->chorus_send * gain;
 
   return FLUID_OK;
 }

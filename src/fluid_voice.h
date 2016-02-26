@@ -90,14 +90,14 @@ struct _fluid_voice_t
 	uint32_t start_time;
 	uint32_t ticks;
 
-	fluid_real_t amp;                /* current linear amplitude */
+	fluid_buf_t amp;                /* current linear amplitude */
 	fluid_phase_t phase;             /* the phase of the sample wave */
 
 	/* Temporary variables used in fluid_voice_write() */
 
-	fluid_real_t phase_incr;	/* the phase increment for the next 64 samples */
-	fluid_real_t amp_incr;		/* amplitude increment value */
-	fluid_real_t *dsp_buf;		/* buffer to store interpolated sample data to */
+	fluid_phase_t phase_incr;	/* the phase increment for the next 64 samples */
+	fluid_buf_t amp_incr;		/* amplitude increment value */
+	fluid_buf_t *dsp_buf;		/* buffer to store interpolated sample data to */
 
 	uint8_t is_looping;
 
@@ -115,6 +115,9 @@ struct _fluid_voice_t
 	uint32_t end;
 	uint32_t loopstart;
 	uint32_t loopend;	/* Note: first point following the loop (superimposed on loopstart) */
+
+	uint64_t loop_size;
+	uint32_t end_index;
 
 	/* master gain */
 	fluid_real_t synth_gain;
@@ -198,8 +201,8 @@ int delete_fluid_voice(fluid_voice_t* voice);
 void fluid_voice_start(fluid_voice_t* voice);
 
 int fluid_voice_write(fluid_voice_t* voice,
-		      fluid_real_t* left, fluid_real_t* right,
-		      fluid_real_t* reverb_buf, fluid_real_t* chorus_buf);
+		      fluid_buf_t* left, fluid_buf_t* right,
+		      fluid_buf_t* reverb_buf, fluid_buf_t* chorus_buf);
 
 int fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
 		     fluid_channel_t* channel, int key, int vel,

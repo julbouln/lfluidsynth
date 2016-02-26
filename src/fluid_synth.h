@@ -115,15 +115,14 @@ struct _fluid_synth_t
   uint32_t storeid;
   int nbuf;                           /** How many audio buffers are used? (depends on nr of audio channels / groups)*/
 
-  fluid_real_t** left_buf;
-  fluid_real_t** right_buf;
-  fluid_real_t** fx_left_buf;
-  fluid_real_t** fx_right_buf;
+  fluid_buf_t** left_buf;
+  fluid_buf_t** right_buf;
+  fluid_buf_t** fx_left_buf;
+  fluid_buf_t** fx_right_buf;
 
   fluid_revmodel_t* reverb;
   fluid_chorus_t* chorus;
   int cur;                           /** the current sample in the audio buffers to be output */
-//  int dither_index;		/* current index in random dither value buffer: fluid_synth_(write_s16|dither_s16) */
 
   char outbuf[256];                  /** buffer for message output */
   double cpu_load;
@@ -194,9 +193,6 @@ int fluid_synth_update_polyphony(fluid_synth_t* synth, char* name, int value);
 fluid_bank_offset_t* fluid_synth_get_bank_offset0(fluid_synth_t* synth, int sfont_id);
 void fluid_synth_remove_bank_offset(fluid_synth_t* synth, int sfont_id);
 
-void fluid_synth_dither_s16(int *dither_index, int len, float* lin, float* rin,
-			    void* lout, int loff, int lincr,
-			    void* rout, int roff, int rincr);
 /*
  * misc
  */
@@ -801,29 +797,6 @@ int fluid_synth_write_s32(fluid_synth_t* synth, int len,
 int fluid_synth_write_float(fluid_synth_t* synth, int len, 
            void* lout, int loff, int lincr, 
            void* rout, int roff, int rincr);
-
-int fluid_synth_nwrite_float(fluid_synth_t* synth, int len, 
-            float** left, float** right, 
-            float** fx_left, float** fx_right);
-
-  /** Generate a number of samples. This function implements the
-   *  default interface defined in fluidsynth/audio.h. This function
-   *  ignores the input buffers and expects at least two output
-   *  buffer.
-   *
-   *  \param synth The synthesizer
-   *  \param len The number of samples to generate
-   *  \param nin The number of input buffers
-   *  \param in The array of input buffers
-   *  \param nout The number of output buffers
-   *  \param out The array of output buffers
-   *  \returns 0 if no error occured, non-zero otherwise
-   */
-
-int fluid_synth_process(fluid_synth_t* synth, int len,
-             int nin, float** in, 
-             int nout, float** out);
-
 
 
   /* Type definition of the synthesizer's audio callback function. */

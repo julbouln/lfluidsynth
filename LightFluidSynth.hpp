@@ -22,8 +22,8 @@ public:
 
 //  fluid_settings_setstr(settings, "audio.period-size", "1024");
 
-    fluid_settings_setstr(settings, "synth.reverb.active", "no");
-    fluid_settings_setstr(settings, "synth.chorus.active", "no");
+    fluid_settings_setstr(settings, "synth.reverb.active", "yes");
+    fluid_settings_setstr(settings, "synth.chorus.active", "yes");
     fluid_settings_setint(settings, "synth.polyphony", POLYPHONY);
 
 //    fluid_settings_setstr(settings, "synth.verbose", "yes");

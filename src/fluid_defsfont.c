@@ -417,18 +417,20 @@ void fluid_sampledata_init(fluid_sampledata_t *s, fluid_file fd) {
 }
 
 
-void fluid_sampledata_read_chunk(fluid_sampledata_t *s, uint32_t index, uint32_t size)
+static void fluid_sampledata_read_chunk(fluid_sampledata_t *s, uint32_t index, uint32_t size)
 {
-      int clip_size=size;
-      int max_size=s->end_index - s->start_index;
-      if(s->read_index+size > max_size)
-        clip_size=max_size - s->read_index;
-      uint32_t t1,t2;
+  int clip_size = size;
+  int max_size = s->end_index - s->start_index;
+  if (s->read_index + size > max_size)
+    clip_size = max_size - s->read_index;
+//  uint32_t t1, t2;
 //      t1=HAL_GetTick();
-//      printf("fluid_sampledata_read_chunk: read %x %d %d %d\n",s,index,s->read_index,clip_size);
-      FLUID_FSEEK(s->fd,(s->start_index+s->read_index)*2,SEEK_SET);
-      int n=FLUID_FREAD((uint8_t*)s->buf+(s->read_index*2),1,clip_size*2,s->fd);
-      s->read_index+=(clip_size);
+  if (clip_size > 0) {
+    //    printf("fluid_sampledata_read_chunk: read %x %d %d / %d %d\n",s,index,size,s->read_index,clip_size);
+    FLUID_FSEEK(s->fd, (s->start_index + s->read_index) * 2, SEEK_SET);
+    int n = FLUID_FREAD((uint8_t*)s->buf + (s->read_index * 2), 1, clip_size * 2, s->fd);
+    s->read_index += (clip_size);
+  }
 //      t2=HAL_GetTick();
 //      printf("fluid_sampledata_read_chunk: read %x %d %d %d in %d\n",s,index,s->read_index,clip_size,t2-t1);
 
@@ -439,7 +441,7 @@ void fluid_sampledata_read(fluid_sampledata_t *s, uint32_t start_index, uint32_t
   if(s->start_index == start_index && s->end_index == end_index)
   {
     #ifdef FLUID_SAMPLE_READ_CHUNK
-    if(index >= s->read_index) {
+    if(index > s->read_index - size) {
       fluid_sampledata_read_chunk(s,index,size);
     }
     #endif
@@ -985,12 +987,6 @@ fluid_synth_sampledata_clean(synth);
           /* add the synthesis process to the synthesis loop. */
           fluid_synth_start_voice(synth, voice);
 
-
-#ifdef FLUID_SAMPLE_READ_DISK
-  uint32_t sample_index=(voice->phase >> 32) - voice->start;
-  fluid_sampledata_read(voice->sample->data, voice->start, voice->end, sample_index, FLUID_SAMPLE_READ_CHUNK_SIZE);
-#endif
-
           /* Store the ID of the first voice that was created by this noteon event.
            * Exclusive class may only terminate older voices.
            * That avoids killing voices, which have just been created.
@@ -1486,6 +1482,7 @@ fluid_inst_import_sfont(fluid_inst_t* inst, SFInst *sfinst, fluid_defsfont_t* sf
     p = fluid_list_next(p);
     count++;
   }
+
   return FLUID_OK;
 }
 

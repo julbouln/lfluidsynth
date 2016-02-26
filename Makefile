@@ -1,8 +1,11 @@
 FLUIDSYNTH_OBJS=$(patsubst %.c,%.o,$(wildcard src/*.c))
 # fluidsynth/drivers/fluid_alsa.o fluidsynth/drivers/fluid_pulse.o
 CFLAGS=-O3 -g -I. -Isrc
-CFLAGS+= -DFLUID_SAMPLE_FORMAT_FLOAT -DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC -DFLUID_SAMPLE_READ_CHUNK -DFLUID_NEW_GEN_API -DFLUID_NEW_VOICE_MOD_API
-#CFLAGS      += -DFLUID_ARM_OPT 
+CFLAGS+= -DFLUID_CALC_FORMAT_FLOAT -DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC -DFLUID_NEW_GEN_API 
+CFLAGS += -DFLUID_NEW_VOICE_MOD_API
+CFLAGS += -DFLUID_SAMPLE_READ_CHUNK
+CFLAGS += -DFLUID_BUFFER_S16
+#CFLAGS += -DFLUID_ARM_OPT 
 #CFLAGS+=-march=native
 #CFLAGS+=-ftree-vectorize -ffast-math -fsingle-precision-constant
 SYNTH_CFLAGS=-Irt -D__LINUX_ALSA__ 
@@ -29,6 +32,10 @@ callgrind: synth
 
 massif: synth
 	pasuspender -- valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./synth $(SF2_PROF_FILE)
+	ms_print massif.out > massif.log
+
+test_massif: test
+	valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./test
 	ms_print massif.out > massif.log
 
 clean:

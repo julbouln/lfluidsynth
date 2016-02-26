@@ -24,11 +24,16 @@ int main() {
 	/* Create the settings. */
 	settings = new_fluid_settings();
 
+	fluid_settings_setstr(settings, "synth.reverb.active", "no");
+    fluid_settings_setstr(settings, "synth.chorus.active", "no");
+    fluid_settings_setint(settings, "synth.polyphony", 64);
+
 	/* Create the synthesizer. */
 	synth = new_fluid_synth(settings);
 
-	sfont_id = fluid_synth_sfload(synth, "timgm6mb.sf2", 1);
-	fluid_synth_set_interp_method(synth, -1, FLUID_INTERP_LINEAR);
+	sfont_id = fluid_synth_sfload(synth, "merlin.sf2", 1);
+	fluid_synth_set_interp_method(synth, -1, FLUID_INTERP_NONE);
+
 /*
 	fluid_synth_noteon(synth, 1, 60, 127);
 	printf("NOTE ON\n");
@@ -47,5 +52,5 @@ int main() {
 	fluid_synth_sfunload(synth, sfont_id, 1);
 	delete_fluid_synth(synth);
 	delete_fluid_settings(settings);
-
+	return 0;
 }
