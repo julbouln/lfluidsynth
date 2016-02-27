@@ -435,7 +435,7 @@ int fluid_voice_calc_amp(fluid_voice_t *voice) {
   }
 
   /* Volume increment to go from voice->amp to target_amp in FLUID_BUFSIZE steps */
-  voice->amp_incr = (FLUID_REAL_TO_FACT(target_amp) - voice->amp) / FLUID_BUFSIZE;
+  voice->amp_incr = (FLUID_REAL_TO_FACT16(target_amp) - voice->amp) / FLUID_BUFSIZE;
 
   /* no volume and not changing? - No need to process */
 #ifdef FLUID_BUFFER_S16
@@ -524,6 +524,8 @@ int fluid_voice_calc_resonant_filter(fluid_voice_t *voice) {
     fluid_real_t a2_temp = (1.0f - alpha_coeff) * a0_inv;
     fluid_real_t b1_temp = (1.0f - cos_coeff) * a0_inv * voice->filter_gain;
     /* both b0 -and- b2 */
+
+//    printf("%f %f\n",a1_temp,a2_temp)
     fluid_real_t b02_temp = b1_temp * 0.5f;
 
     if (voice->filter_startup)
@@ -706,14 +708,51 @@ void fluid_dsp_float_config (void)
 int fluid_voice_calc_effects(fluid_voice_t *voice,
                  fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf, uint16_t cnt)
 {
-  fluid_buf_t amp_reverb = FLUID_REAL_TO_FACT(voice->amp_reverb);
-  fluid_buf_t amp_chorus = FLUID_REAL_TO_FACT(voice->amp_chorus);
+    fluid_buf_t *dsp_buf = voice->dsp_buf;
+  fluid_buf_t amp_reverb = FLUID_REAL_TO_FACT16(voice->amp_reverb);
+  fluid_buf_t amp_chorus = FLUID_REAL_TO_FACT16(voice->amp_chorus);
+
+  uint32_t dsp_cnt;
+  fluid_buf_t in0,in1,in2,in3;
 
 #ifndef FLUID_BUFFER_S16
   amp_reverb = amp_reverb / 32768.0f;
   amp_chorus = amp_chorus / 32768.0f;
 #endif
 
+
+  dsp_cnt = (cnt >> 2);
+
+  while (dsp_cnt > 0)
+  {
+//    __asm("BKPT 5");
+
+    in0=*(dsp_buf++);
+    in1=*(dsp_buf++);
+    in2=*(dsp_buf++);
+    in3=*(dsp_buf++);
+    
+    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in0,*(dsp_reverb_buf));
+    *(dsp_reverb_buf)++;
+    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in1,*(dsp_reverb_buf));
+    *(dsp_reverb_buf)++;
+    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in2,*(dsp_reverb_buf));
+    *(dsp_reverb_buf)++;
+    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in3,*(dsp_reverb_buf));
+    *(dsp_reverb_buf)++;
+
+    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in0,*(dsp_chorus_buf));
+    *(dsp_chorus_buf)++;
+    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in1,*(dsp_chorus_buf));
+    *(dsp_chorus_buf)++;
+    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in2,*(dsp_chorus_buf));
+    *(dsp_chorus_buf)++;
+    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in3,*(dsp_chorus_buf));
+    *(dsp_chorus_buf)++;
+
+    dsp_cnt--;
+//    __asm("BKPT 6");
+  }
 
 #if 0
 
@@ -738,8 +777,8 @@ uint32_t fluid_voice_calc_stereo(fluid_voice_t *voice,
                  fluid_buf_t* dsp_left_buf, fluid_buf_t* dsp_right_buf, uint32_t cnt)
 {
     fluid_buf_t *dsp_buf = voice->dsp_buf;
-  fluid_buf_t amp_left = FLUID_REAL_TO_FACT(voice->amp_left);
-  fluid_buf_t amp_right = FLUID_REAL_TO_FACT(voice->amp_right);
+  fluid_buf_t amp_left = FLUID_REAL_TO_FACT16(voice->amp_left);
+  fluid_buf_t amp_right = FLUID_REAL_TO_FACT16(voice->amp_right);
 
   uint32_t dsp_cnt;
   fluid_buf_t in0,in1,in2,in3;
@@ -872,7 +911,7 @@ fluid_voice_calc(fluid_voice_t *voice)
         break;
       }
     }
-    
+
     dsp_cnt--;
 //    __asm("BKPT 2");
   }
@@ -936,7 +975,7 @@ fluid_voice_write(fluid_voice_t* voice,
     return FLUID_OK;
   }
 
-  fluid_voice_calc_resonant_filter(voice);
+//  fluid_voice_calc_resonant_filter(voice);
 
   /*********************** run the dsp chain ************************
    * The sample is mixed with the output buffer.
@@ -969,7 +1008,7 @@ fluid_voice_write(fluid_voice_t* voice,
   count = fluid_voice_calc(voice);
 
   fluid_voice_calc_stereo(voice, dsp_left_buf, dsp_right_buf, count);
-//  fluid_voice_calc_effects(voice,dsp_reverb_buf, dsp_chorus_buf);
+  fluid_voice_calc_effects(voice,dsp_reverb_buf, dsp_chorus_buf, count);
 
   /* turn off voice if short count (sample ended and not looping) */
   if (count < FLUID_BUFSIZE)

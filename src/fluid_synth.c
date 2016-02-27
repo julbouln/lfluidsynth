@@ -683,12 +683,6 @@ delete_fluid_synth(fluid_synth_t* synth)
     FLUID_FREE(synth->tuning);
   }
 
-#ifdef LADSPA
-  /* Release the LADSPA Fx unit */
-  fluid_LADSPA_shutdown(synth->LADSPA_FxUnit);
-  FLUID_FREE(synth->LADSPA_FxUnit);
-#endif
-
   fluid_mutex_destroy(synth->busy);
 
   FLUID_FREE(synth);
@@ -1777,28 +1771,7 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
   /* if multi channel output, don't mix the output of the chorus and
      reverb in the final output. The effects outputs are send
      separately. */
-#if 0
-  if (do_not_mix_fx_to_out) {
-
-    /* send to reverb */
-    if (synth->reverb != NULL) {
-      if (reverb_buf) {
-        fluid_revmodel_processreplace(synth->reverb, reverb_buf,
-        synth->fx_left_buf[0], synth->fx_right_buf[0]);
-      }
-    }
-
-
-    /* send to chorus */
-    if (synth->chorus != NULL) {
-      if (chorus_buf) {
-        fluid_chorus_processreplace(synth->chorus, chorus_buf,
-                                    synth->fx_left_buf[1], synth->fx_right_buf[1]);
-      }
-    }
-
-  } else {
-
+#if 1
     /* send to reverb */
     if (synth->reverb != NULL) {
       if (reverb_buf) {
@@ -1806,7 +1779,7 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
         synth->left_buf[0], synth->right_buf[0]);
       }
     }
-
+    #if 0
 
     /* send to chorus */
     if (synth->chorus != NULL) {
@@ -1816,8 +1789,9 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
                                 synth->left_buf[0], synth->right_buf[0]);
       }
     }
-  }
 #endif
+//  }
+   #endif
   synth->ticks += FLUID_BUFSIZE;
 
 /*

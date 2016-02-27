@@ -427,8 +427,8 @@ fluid_chorus_update(fluid_chorus_t* chorus)
 }
 
 
-void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_real_t *in,
-			    fluid_real_t *left_out, fluid_real_t *right_out)
+void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
+			    fluid_buf_t *left_out, fluid_buf_t *right_out)
 {
   int sample_index;
   int i;

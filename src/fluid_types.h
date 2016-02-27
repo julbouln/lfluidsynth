@@ -114,7 +114,8 @@ typedef double fluid_real_t;
 #endif
 
 #ifdef FLUID_BUFFER_S16
-	typedef int32_t fluid_buf_t;
+	typedef int32_t fluid_buf_t; // q31_t
+	typedef int16_t fluid_buf16_t; // q15_t
 	#define FLUID_BUF_FLOAT(v) ((v >> 15)/32768.0f)
 	#define FLUID_BUF_S16(v) (v >> 15)
 	#define FLUID_BUF_SAMPLE(v) (v << 16)
@@ -134,20 +135,29 @@ typedef double fluid_real_t;
 		  return result;
  	}
 		#define FLUID_BUF_MULT(a,b) __SMULWB(a,b)
+		#define FLUID_BUF_MULT32(a,b) (int32_t)(((int64_t)a*(int64_t)b) >> 15) 	
 		#define FLUID_BUF_MAC(a,b,accu) __SMLAWB(a,b,accu)
 	#else
-		#define FLUID_BUF_MULT(a,b) (int32_t)(((int64_t)a*b) >> 16)	
-		#define FLUID_BUF_MAC(a,b,accu) (int32_t)(((int64_t)a*b) >> 16) + accu	
+		#define FLUID_BUF_MULT(a,b) (int32_t)(((int64_t)a*b) >> 15)	
+		#define FLUID_BUF_MULT32(a,b) (int32_t)(((int64_t)a*(int64_t)b) >> 15)
+		#define FLUID_BUF_MAC(a,b,accu) (int32_t)(((int64_t)a*b) >> 15) + accu	
 	#endif
-	#define FLUID_REAL_TO_FACT(v) (int16_t)(v*32768.0f)
+	#define FLUID_REAL_TO_FACT16(v) (int16_t)((v)*32768.0f)
+	#define FLUID_REAL_TO_FACT(v) (int32_t)((v)*32768.0f)
+	#define FLUID_FACT_TO_REAL(v) (fluid_real_t)((v)/32768.0f)
 	#define BUF_SAT(v) (int16_t)v
 #else
 	typedef float fluid_buf_t;
+	typedef float fluid_buf16_t;
 	#define FLUID_BUF_FLOAT(v) v
 	#define FLUID_BUF_S16(v) (v*32768.0f)
 	#define FLUID_BUF_SAMPLE(v) v
 	#define FLUID_BUF_MULT(a,b) a*b
+	#define FLUID_BUF_MULT32(a,b) a*b
+	#define FLUID_BUF_MAC(a,b,accu) a*b + accu	
+	#define FLUID_REAL_TO_FACT16(v) v
 	#define FLUID_REAL_TO_FACT(v) v
+	#define FLUID_FACT_TO_REAL(v) v
 	#define BUF_SAT(v) v
 #endif
 
