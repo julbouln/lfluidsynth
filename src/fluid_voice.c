@@ -435,7 +435,7 @@ int fluid_voice_calc_amp(fluid_voice_t *voice) {
   }
 
   /* Volume increment to go from voice->amp to target_amp in FLUID_BUFSIZE steps */
-  voice->amp_incr = (FLUID_REAL_TO_FACT16(target_amp) - voice->amp) / FLUID_BUFSIZE;
+  voice->amp_incr = (FLUID_REAL_TO_FRAC16(target_amp) - voice->amp) / FLUID_BUFSIZE;
 
   /* no volume and not changing? - No need to process */
 #ifdef FLUID_BUFFER_S16
@@ -709,17 +709,11 @@ int fluid_voice_calc_effects(fluid_voice_t *voice,
                  fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf, uint16_t cnt)
 {
     fluid_buf_t *dsp_buf = voice->dsp_buf;
-  fluid_buf_t amp_reverb = FLUID_REAL_TO_FACT16(voice->amp_reverb);
-  fluid_buf_t amp_chorus = FLUID_REAL_TO_FACT16(voice->amp_chorus);
+  fluid_buf_t amp_reverb = FLUID_REAL_TO_FRAC16(voice->amp_reverb);
+  fluid_buf_t amp_chorus = FLUID_REAL_TO_FRAC16(voice->amp_chorus);
 
   uint32_t dsp_cnt;
   fluid_buf_t in0,in1,in2,in3;
-
-#ifndef FLUID_BUFFER_S16
-  amp_reverb = amp_reverb / 32768.0f;
-  amp_chorus = amp_chorus / 32768.0f;
-#endif
-
 
   dsp_cnt = (cnt >> 2);
 
@@ -754,22 +748,6 @@ int fluid_voice_calc_effects(fluid_voice_t *voice,
 //    __asm("BKPT 6");
   }
 
-#if 0
-
-  /* reverb send. Buffer may be NULL. */
-  if ((dsp_reverb_buf != NULL) && (voice->amp_reverb != 0.0))
-  {
-    for (dsp_i = 0; dsp_i < count; dsp_i++)
-      dsp_reverb_buf[dsp_i] += voice->amp_reverb * dsp_buf[dsp_i];
-  }
-
-  /* chorus send. Buffer may be NULL. */
-  if ((dsp_chorus_buf != NULL) && (voice->amp_chorus != 0))
-  {
-    for (dsp_i = 0; dsp_i < count; dsp_i++)
-      dsp_chorus_buf[dsp_i] += voice->amp_chorus * dsp_buf[dsp_i];
-  }
-#endif
   return cnt;
 }
 
@@ -777,18 +755,11 @@ uint32_t fluid_voice_calc_stereo(fluid_voice_t *voice,
                  fluid_buf_t* dsp_left_buf, fluid_buf_t* dsp_right_buf, uint32_t cnt)
 {
     fluid_buf_t *dsp_buf = voice->dsp_buf;
-  fluid_buf_t amp_left = FLUID_REAL_TO_FACT16(voice->amp_left);
-  fluid_buf_t amp_right = FLUID_REAL_TO_FACT16(voice->amp_right);
+  fluid_buf_t amp_left = FLUID_REAL_TO_FRAC16(voice->amp_left);
+  fluid_buf_t amp_right = FLUID_REAL_TO_FRAC16(voice->amp_right);
 
   uint32_t dsp_cnt;
   fluid_buf_t in0,in1,in2,in3;
-
-#ifndef FLUID_BUFFER_S16
-  amp_left = amp_left / 32768.0f;
-  amp_right = amp_right / 32768.0f;
-
-#endif
-
 
   dsp_cnt = (cnt >> 2);
 
@@ -1296,10 +1267,15 @@ fluid_voice_update_param(fluid_voice_t* voice, int gen)
   case GEN_PAN:
     /* range checking is done in the fluid_pan function */
     voice->pan = _GEN(voice, GEN_PAN);
-//    voice->amp_left = fluid_pan(voice->pan, 1) * voice->synth_gain / 32768.0f;
-//    voice->amp_right = fluid_pan(voice->pan, 0) * voice->synth_gain / 32768.0f;
     voice->amp_left = fluid_pan(voice->pan, 1) * voice->synth_gain;
+    #ifndef FLUID_BUFFER_S16
+    voice->amp_left /= 32768.0f;
+    #endif
+
     voice->amp_right = fluid_pan(voice->pan, 0) * voice->synth_gain;
+    #ifndef FLUID_BUFFER_S16
+    voice->amp_right /= 32768.0f;
+    #endif
     break;
 
   case GEN_ATTENUATION:
@@ -1328,16 +1304,22 @@ fluid_voice_update_param(fluid_voice_t* voice, int gen)
     /* The generator unit is 'tenths of a percent'. */
     voice->reverb_send = _GEN(voice, GEN_REVERBSEND) / 1000.0f;
     fluid_clip(voice->reverb_send, 0.0, 1.0);
-//    voice->amp_reverb = voice->reverb_send * voice->synth_gain / 32768.0f;
     voice->amp_reverb = voice->reverb_send * voice->synth_gain;
+    #ifndef FLUID_BUFFER_S16
+    voice->amp_reverb /= 32768.0f;
+    #endif
+
     break;
 
   case GEN_CHORUSSEND:
     /* The generator unit is 'tenths of a percent'. */
     voice->chorus_send = _GEN(voice, GEN_CHORUSSEND) / 1000.0f;
     fluid_clip(voice->chorus_send, 0.0, 1.0);
-//    voice->amp_chorus = voice->chorus_send * voice->synth_gain / 32768.0f;
     voice->amp_chorus = voice->chorus_send * voice->synth_gain;
+    #ifndef FLUID_BUFFER_S16
+    voice->amp_chorus /= 32768.0f;
+    #endif
+
     break;
 
   case GEN_OVERRIDEROOTKEY:
@@ -2336,15 +2318,18 @@ int fluid_voice_set_gain(fluid_voice_t* voice, fluid_real_t gain)
   }
 
   voice->synth_gain = gain;
-//  voice->amp_left = fluid_pan(voice->pan, 1) * gain / 32768.0f;
-//  voice->amp_right = fluid_pan(voice->pan, 0) * gain / 32768.0f;
   voice->amp_left = fluid_pan(voice->pan, 1) * gain;
   voice->amp_right = fluid_pan(voice->pan, 0) * gain;
 
-//  voice->amp_reverb = voice->reverb_send * gain / 32768.0f;
-//  voice->amp_chorus = voice->chorus_send * gain / 32768.0f;
   voice->amp_reverb = voice->reverb_send * gain;
   voice->amp_chorus = voice->chorus_send * gain;
+
+#ifndef FLUID_BUFFER_S16
+  voice->amp_left /= 32768.0f;
+  voice->amp_right /= 32768.0f;
+  voice->amp_reverb /= 32768.0f;
+  voice->amp_chorus /= 32768.0f;
+#endif
 
   return FLUID_OK;
 }

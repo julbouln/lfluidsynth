@@ -334,7 +334,7 @@ new_fluid_revmodel()
   fluid_allpass_setbuffer(&rev->allpassR[3], rev->bufallpassR4, allpasstuningR4);
 
 
-  fluid_buf_t default_feedback = FLUID_REAL_TO_FACT(0.5f);
+  fluid_buf_t default_feedback = FLUID_REAL_TO_FRAC(0.5f);
 
   /* Set default values */
   fluid_allpass_setfeedback(&rev->allpassL[0], default_feedback);
@@ -437,17 +437,17 @@ fluid_revmodel_update(fluid_revmodel_t* rev)
   /* Recalculate internal values after parameter change */
   int i;
 
-  rev->wet1 = FLUID_REAL_TO_FACT(rev->wet * (rev->width / 2 + 0.5f));
-  rev->wet2 = FLUID_REAL_TO_FACT(rev->wet * ((1 - rev->width) / 2));
+  rev->wet1 = FLUID_REAL_TO_FRAC(rev->wet * (rev->width / 2 + 0.5f));
+  rev->wet2 = FLUID_REAL_TO_FRAC(rev->wet * ((1 - rev->width) / 2));
 
   for (i = 0; i < NUMCOMBS; i++) {
-    fluid_comb_setfeedback(&rev->combL[i], FLUID_REAL_TO_FACT(rev->roomsize));
-    fluid_comb_setfeedback(&rev->combR[i], FLUID_REAL_TO_FACT(rev->roomsize));
+    fluid_comb_setfeedback(&rev->combL[i], FLUID_REAL_TO_FRAC(rev->roomsize));
+    fluid_comb_setfeedback(&rev->combR[i], FLUID_REAL_TO_FRAC(rev->roomsize));
   }
 
   for (i = 0; i < NUMCOMBS; i++) {
-    fluid_comb_setdamp(&rev->combL[i], FLUID_REAL_TO_FACT(rev->damp));
-    fluid_comb_setdamp(&rev->combR[i], FLUID_REAL_TO_FACT(rev->damp));
+    fluid_comb_setdamp(&rev->combL[i], FLUID_REAL_TO_FRAC(rev->damp));
+    fluid_comb_setdamp(&rev->combR[i], FLUID_REAL_TO_FRAC(rev->damp));
   }
 
 //printf("WET %f %f\n",rev->wet * (rev->width / 2 + 0.5f),rev->wet * ((1 - rev->width) / 2));

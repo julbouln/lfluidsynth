@@ -1641,8 +1641,8 @@ fluid_synth_write_s16(fluid_synth_t* synth, int len,
     left_sample =  (int16_t) FLUID_BUF_S16(left_sample);
     right_sample =  (int16_t) FLUID_BUF_S16(right_sample);
 
-    left_out[j] = BUF_SAT(left_sample);
-    right_out[k] = BUF_SAT(right_sample);
+    left_out[j] = FLUID_BUF_SAT(left_sample);
+    right_out[k] = FLUID_BUF_SAT(right_sample);
   }
 
   synth->cur = l;
@@ -1739,8 +1739,11 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
    * enabled on synth level.  Nonexisting buffers are detected in the
    * DSP loop. Not sending the reverb / chorus signal saves some time
    * in that case. */
-  reverb_buf = synth->with_reverb ? synth->fx_left_buf[0] : NULL;
-  chorus_buf = synth->with_chorus ? synth->fx_left_buf[1] : NULL;
+//  reverb_buf = synth->with_reverb ? synth->fx_left_buf[0] : NULL;
+//  chorus_buf = synth->with_chorus ? synth->fx_left_buf[1] : NULL;
+
+  reverb_buf = synth->fx_left_buf[0];
+  chorus_buf = synth->fx_left_buf[1];
 
   /* call all playing synthesis processes */
   for (i = 0; i < synth->polyphony; i++) {
@@ -1771,7 +1774,7 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
   /* if multi channel output, don't mix the output of the chorus and
      reverb in the final output. The effects outputs are send
      separately. */
-#if 1
+
     /* send to reverb */
     if (synth->reverb != NULL) {
       if (reverb_buf) {
@@ -1779,7 +1782,6 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
         synth->left_buf[0], synth->right_buf[0]);
       }
     }
-    #if 0
 
     /* send to chorus */
     if (synth->chorus != NULL) {
@@ -1789,9 +1791,7 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
                                 synth->left_buf[0], synth->right_buf[0]);
       }
     }
-#endif
-//  }
-   #endif
+
   synth->ticks += FLUID_BUFSIZE;
 
 /*

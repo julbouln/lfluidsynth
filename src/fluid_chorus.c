@@ -120,14 +120,14 @@ struct _fluid_chorus_t {
   int new_type;              /* next value, if parameter check is OK */
   fluid_real_t depth_ms;      /* current value */
   fluid_real_t new_depth_ms;  /* next value, if parameter check is OK */
-  fluid_real_t level;         /* current value */
-  fluid_real_t new_level;     /* next value, if parameter check is OK */
+  fluid_buf_t level;         /* current value */
+  fluid_buf_t new_level;     /* next value, if parameter check is OK */
   fluid_real_t speed_Hz;      /* current value */
   fluid_real_t new_speed_Hz;  /* next value, if parameter check is OK */
   int number_blocks;         /* current value */
   int new_number_blocks;     /* next value, if parameter check is OK */
 
-  fluid_real_t *chorusbuf;
+  fluid_buf_t *chorusbuf;
   int counter;
   long phase[MAX_CHORUS];
   long modulation_period_samples;
@@ -135,7 +135,7 @@ struct _fluid_chorus_t {
   fluid_real_t sample_rate;
 
   /* sinc lookup table */
-  fluid_real_t sinc_table[INTERPOLATION_SAMPLES][INTERPOLATION_SUBSAMPLES];
+  fluid_buf_t sinc_table[INTERPOLATION_SAMPLES][INTERPOLATION_SUBSAMPLES];
 };
 
 void fluid_chorus_triangle(int *buf, int len, int depth);
@@ -160,22 +160,27 @@ new_fluid_chorus(fluid_real_t sample_rate)
   /* Lookup table for the SI function (impulse response of an ideal low pass) */
 
   /* i: Offset in terms of whole samples */
-  for (i = 0; i < INTERPOLATION_SAMPLES; i++){
+  for (i = 0; i < INTERPOLATION_SAMPLES; i++) {
 
     /* ii: Offset in terms of fractional samples ('subsamples') */
-    for (ii = 0; ii < INTERPOLATION_SUBSAMPLES; ii++){
+    for (ii = 0; ii < INTERPOLATION_SUBSAMPLES; ii++) {
       /* Move the origin into the center of the table */
-      double i_shifted = ((double) i- ((double) INTERPOLATION_SAMPLES) / 2.
-			  + (double) ii / (double) INTERPOLATION_SUBSAMPLES);
+      double i_shifted = ((double) i - ((double) INTERPOLATION_SAMPLES) / 2.
+      + (double) ii / (double) INTERPOLATION_SUBSAMPLES);
       if (FLUID_ABS(i_shifted) < 0.000001) {
-	/* sinc(0) cannot be calculated straightforward (limit needed
-	   for 0/0) */
-	chorus->sinc_table[i][ii] = (fluid_real_t)1.;
+        /* sinc(0) cannot be calculated straightforward (limit needed
+           for 0/0) */
+#ifdef FLUID_BUFFER_S16
+        chorus->sinc_table[i][ii] = 32768;
+#else
+        chorus->sinc_table[i][ii] = (fluid_real_t)1.;
+#endif
 
       } else {
-	chorus->sinc_table[i][ii] = (fluid_real_t)FLUID_SIN(i_shifted * M_PI) / (M_PI * i_shifted);
-	/* Hamming window */
-	chorus->sinc_table[i][ii] *= (fluid_real_t)0.5 * (1.0 + FLUID_COS(2.0 * M_PI * i_shifted / (fluid_real_t)INTERPOLATION_SAMPLES));
+        chorus->sinc_table[i][ii] = FLUID_REAL_TO_FRAC((fluid_real_t)FLUID_SIN(i_shifted * M_PI) / (M_PI * i_shifted));
+        /* Hamming window */
+        fluid_buf_t win = FLUID_REAL_TO_FRAC((fluid_real_t)0.5 * (1.0 + FLUID_COS(2.0 * M_PI * i_shifted / (fluid_real_t)INTERPOLATION_SAMPLES)));
+        chorus->sinc_table[i][ii] = FLUID_BUF_MULT32(win, chorus->sinc_table[i][ii]);
       };
     };
   };
@@ -189,7 +194,7 @@ new_fluid_chorus(fluid_real_t sample_rate)
 
   /* allocate sample buffer */
 
-  chorus->chorusbuf = FLUID_ARRAY(fluid_real_t, MAX_SAMPLES);
+  chorus->chorusbuf = FLUID_ARRAY(fluid_buf_t, MAX_SAMPLES);
   if (chorus->chorusbuf == NULL) {
     FLUID_LOG(FLUID_PANIC, "chorus: Out of memory");
     goto error_recovery;
@@ -213,7 +218,7 @@ fluid_chorus_init(fluid_chorus_t* chorus)
   int i;
 
   for (i = 0; i < MAX_SAMPLES; i++) {
-    chorus->chorusbuf[i] = 0.0;
+    chorus->chorusbuf[i] = 0;
   }
 
   /* initialize the chorus with the default settings */
@@ -248,7 +253,7 @@ int fluid_chorus_get_nr(fluid_chorus_t* chorus)
  * Requires calling fluid_chorus_update afterwards.*/
 void fluid_chorus_set_level(fluid_chorus_t* chorus, fluid_real_t level)
 {
-  chorus->new_level = level;
+  chorus->new_level = FLUID_REAL_TO_FRAC(level);
 }
 
 /* Purpose:
@@ -256,7 +261,7 @@ void fluid_chorus_set_level(fluid_chorus_t* chorus, fluid_real_t level)
  */
 fluid_real_t fluid_chorus_get_level(fluid_chorus_t* chorus)
 {
-    return chorus->level;
+    return FLUID_FRAC_TO_REAL(chorus->level);
 };
 
 /* Purpose:
@@ -362,6 +367,17 @@ fluid_chorus_update(fluid_chorus_t* chorus)
   }
   /* Depth: Check for too high value through modulation_depth_samples. */
 
+#ifdef FLUID_BUFFER_S16
+    if (chorus->new_level < 0) {
+    FLUID_LOG(FLUID_WARN, "chorus: level must be positive! Setting value to 0.");
+    chorus->new_level = 0;
+  } else if (chorus->new_level > FLUID_REAL_TO_FRAC(10.0)) {
+    FLUID_LOG(FLUID_WARN, "chorus: level must be < 10. A reasonable level is << 1! "
+       "Setting it to 0.1.");
+    chorus->new_level = FLUID_REAL_TO_FRAC(0.1);
+  }
+
+#else
   if (chorus->new_level < 0.0) {
     FLUID_LOG(FLUID_WARN, "chorus: level must be positive! Setting value to 0.");
     chorus->new_level = 0.0;
@@ -370,7 +386,7 @@ fluid_chorus_update(fluid_chorus_t* chorus)
 	     "Setting it to 0.1.");
     chorus->new_level = 0.1;
   }
-
+#endif
   /* The modulating LFO goes through a full period every x samples: */
   chorus->modulation_period_samples = chorus->sample_rate / chorus->new_speed_Hz;
 
@@ -428,22 +444,16 @@ fluid_chorus_update(fluid_chorus_t* chorus)
 
 
 void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
-			    fluid_buf_t *left_out, fluid_buf_t *right_out)
+                             fluid_buf_t *left_out, fluid_buf_t *right_out)
 {
   int sample_index;
   int i;
-  fluid_real_t d_in, d_out;
+  fluid_buf_t d_in, d_out;
 
   for (sample_index = 0; sample_index < FLUID_BUFSIZE; sample_index++) {
 
     d_in = in[sample_index];
-    d_out = 0.0f;
-
-# if 0
-    /* Debug: Listen to the chorus signal only */
-    left_out[sample_index]=0;
-    right_out[sample_index]=0;
-#endif
+    d_out = 0;
 
     /* Write the current sample into the circular buffer */
     chorus->chorusbuf[chorus->counter] = d_in;
@@ -457,103 +467,35 @@ void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
        * full periods of MAX_SAMPLES*INTERPOLATION_SUBSAMPLES to
        * remain positive at all times. */
       int pos_subsamples = (INTERPOLATION_SUBSAMPLES * chorus->counter
-			    - chorus->lookup_tab[chorus->phase[i]]);
-
-      int pos_samples = pos_subsamples/INTERPOLATION_SUBSAMPLES;
-
-      /* modulo divide by INTERPOLATION_SUBSAMPLES */
-      pos_subsamples &= INTERPOLATION_SUBSAMPLES_ANDMASK;
-
-      for (ii = 0; ii < INTERPOLATION_SAMPLES; ii++){
-	/* Add the delayed signal to the chorus sum d_out Note: The
-	 * delay in the delay line moves backwards for increasing
-	 * delay!*/
-
-	/* The & in chorusbuf[...] is equivalent to a division modulo
-	   MAX_SAMPLES, only faster. */
-	d_out += chorus->chorusbuf[pos_samples & MAX_SAMPLES_ANDMASK]
-	  * chorus->sinc_table[ii][pos_subsamples];
-
-	pos_samples--;
-      };
-      /* Cycle the phase of the modulating LFO */
-      chorus->phase[i]++;
-      chorus->phase[i] %= (chorus->modulation_period_samples);
-    } /* foreach chorus block */
-
-    d_out *= chorus->level;
-
-    /* Add the chorus sum d_out to output */
-    left_out[sample_index] += d_out;
-    right_out[sample_index] += d_out;
-
-    /* Move forward in circular buffer */
-    chorus->counter++;
-    chorus->counter %= MAX_SAMPLES;
-
-  } /* foreach sample */
-}
-
-/* Duplication of code ... (replaces sample data instead of mixing) */
-void fluid_chorus_processreplace(fluid_chorus_t* chorus, fluid_real_t *in,
-				fluid_real_t *left_out, fluid_real_t *right_out)
-{
-  int sample_index;
-  int i;
-  fluid_real_t d_in, d_out;
-
-  for (sample_index = 0; sample_index < FLUID_BUFSIZE; sample_index++) {
-
-    d_in = in[sample_index];
-    d_out = 0.0f;
-
-# if 0
-    /* Debug: Listen to the chorus signal only */
-    left_out[sample_index]=0;
-    right_out[sample_index]=0;
-#endif
-
-    /* Write the current sample into the circular buffer */
-    chorus->chorusbuf[chorus->counter] = d_in;
-
-    for (i = 0; i < chorus->number_blocks; i++) {
-      int ii;
-      /* Calculate the delay in subsamples for the delay line of chorus block nr. */
-
-      /* The value in the lookup table is so, that this expression
-       * will always be positive.  It will always include a number of
-       * full periods of MAX_SAMPLES*INTERPOLATION_SUBSAMPLES to
-       * remain positive at all times. */
-      int pos_subsamples = (INTERPOLATION_SUBSAMPLES * chorus->counter
-			    - chorus->lookup_tab[chorus->phase[i]]);
+                            - chorus->lookup_tab[chorus->phase[i]]);
 
       int pos_samples = pos_subsamples / INTERPOLATION_SUBSAMPLES;
 
       /* modulo divide by INTERPOLATION_SUBSAMPLES */
       pos_subsamples &= INTERPOLATION_SUBSAMPLES_ANDMASK;
 
-      for (ii = 0; ii < INTERPOLATION_SAMPLES; ii++){
-	/* Add the delayed signal to the chorus sum d_out Note: The
-	 * delay in the delay line moves backwards for increasing
-	 * delay!*/
+      for (ii = 0; ii < INTERPOLATION_SAMPLES; ii++) {
+        /* Add the delayed signal to the chorus sum d_out Note: The
+         * delay in the delay line moves backwards for increasing
+         * delay!*/
 
-	/* The & in chorusbuf[...] is equivalent to a division modulo
-	   MAX_SAMPLES, only faster. */
-	d_out += chorus->chorusbuf[pos_samples & MAX_SAMPLES_ANDMASK]
-	  * chorus->sinc_table[ii][pos_subsamples];
+        /* The & in chorusbuf[...] is equivalent to a division modulo
+           MAX_SAMPLES, only faster. */
+        d_out = FLUID_BUF_MAC32(chorus->chorusbuf[pos_samples & MAX_SAMPLES_ANDMASK],
+                 chorus->sinc_table[ii][pos_subsamples],d_out);
 
-	pos_samples--;
+        pos_samples--;
       };
       /* Cycle the phase of the modulating LFO */
       chorus->phase[i]++;
       chorus->phase[i] %= (chorus->modulation_period_samples);
     } /* foreach chorus block */
 
-    d_out *= chorus->level;
+    d_out = (FLUID_BUF_MULT32(chorus->level,d_out));
 
-    /* Store the chorus sum d_out to output */
-    left_out[sample_index] = d_out;
-    right_out[sample_index] = d_out;
+    /* Add the chorus sum d_out to output */
+    left_out[sample_index] += d_out;
+    right_out[sample_index] += d_out;
 
     /* Move forward in circular buffer */
     chorus->counter++;

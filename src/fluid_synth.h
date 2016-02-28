@@ -505,8 +505,6 @@ int fluid_synth_get_chorus_type(fluid_synth_t* synth); /* see fluid_chorus_mod *
 #define FLUID_CHORUS_DEFAULT_DEPTH 8.0f
 #define FLUID_CHORUS_DEFAULT_TYPE FLUID_CHORUS_MOD_SINE 
 
-
-
   /*
    * 
    * Audio and MIDI channels 
