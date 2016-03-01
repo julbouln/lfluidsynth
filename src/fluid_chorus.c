@@ -96,7 +96,7 @@
    samples
 */
 #define INTERPOLATION_SUBSAMPLES_LN2 8
-#define INTERPOLATION_SUBSAMPLES (1 << (INTERPOLATION_SUBSAMPLES_LN2-1))
+#define INTERPOLATION_SUBSAMPLES (1 << (INTERPOLATION_SUBSAMPLES_LN2-1)) // 128
 #define INTERPOLATION_SUBSAMPLES_ANDMASK (INTERPOLATION_SUBSAMPLES-1)
 
 /* Use how many samples for interpolation? Must be odd.  '7' sounds
@@ -458,7 +458,7 @@ void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
     /* Write the current sample into the circular buffer */
     chorus->chorusbuf[chorus->counter] = d_in;
 
-    for (i = 0; i < chorus->number_blocks; i++) {
+    for (i = 0; i < chorus->number_blocks; i++) { // FLUID_CHORUS_DEFAULT_N = 3
       int ii;
       /* Calculate the delay in subsamples for the delay line of chorus block nr. */
 
@@ -474,7 +474,7 @@ void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
       /* modulo divide by INTERPOLATION_SUBSAMPLES */
       pos_subsamples &= INTERPOLATION_SUBSAMPLES_ANDMASK;
 
-      for (ii = 0; ii < INTERPOLATION_SAMPLES; ii++) {
+      for (ii = 0; ii < INTERPOLATION_SAMPLES; ii++) { // INTERPOLATION_SAMPLES = 5
         /* Add the delayed signal to the chorus sum d_out Note: The
          * delay in the delay line moves backwards for increasing
          * delay!*/
@@ -482,13 +482,15 @@ void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
         /* The & in chorusbuf[...] is equivalent to a division modulo
            MAX_SAMPLES, only faster. */
         d_out = FLUID_BUF_MAC32(chorus->chorusbuf[pos_samples & MAX_SAMPLES_ANDMASK],
-                 chorus->sinc_table[ii][pos_subsamples],d_out);
+                 chorus->sinc_table[ii][pos_subsamples], d_out);
 
         pos_samples--;
       };
       /* Cycle the phase of the modulating LFO */
       chorus->phase[i]++;
-      chorus->phase[i] %= (chorus->modulation_period_samples);
+      if(chorus->phase[i] >= chorus->modulation_period_samples)
+        chorus->phase[i] = 0;
+//      chorus->phase[i] %= (chorus->modulation_period_samples);
     } /* foreach chorus block */
 
     d_out = (FLUID_BUF_MULT32(chorus->level,d_out));
@@ -499,7 +501,9 @@ void fluid_chorus_processmix(fluid_chorus_t* chorus, fluid_buf_t *in,
 
     /* Move forward in circular buffer */
     chorus->counter++;
-    chorus->counter %= MAX_SAMPLES;
+    if(chorus->counter >= MAX_SAMPLES)
+      chorus->counter=0;
+//    chorus->counter %= MAX_SAMPLES;
 
   } /* foreach sample */
 }

@@ -706,48 +706,63 @@ void fluid_dsp_float_config (void)
 
 // TODO
 int fluid_voice_calc_effects(fluid_voice_t *voice,
-                 fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf, uint16_t cnt)
+                             fluid_buf_t* dsp_reverb_buf, fluid_buf_t* dsp_chorus_buf, uint16_t cnt)
 {
-    fluid_buf_t *dsp_buf = voice->dsp_buf;
+  fluid_buf_t *dsp_buf = voice->dsp_buf;
   fluid_buf_t amp_reverb = FLUID_REAL_TO_FRAC16(voice->amp_reverb);
   fluid_buf_t amp_chorus = FLUID_REAL_TO_FRAC16(voice->amp_chorus);
 
   uint32_t dsp_cnt;
-  fluid_buf_t in0,in1,in2,in3;
+  fluid_buf_t in0, in1, in2, in3;
 
-  dsp_cnt = (cnt >> 2);
-
-  while (dsp_cnt > 0)
-  {
+  if (dsp_reverb_buf != NULL) {
+    dsp_cnt = (cnt >> 2);
+    while (dsp_cnt > 0)
+    {
 //    __asm("BKPT 5");
 
-    in0=*(dsp_buf++);
-    in1=*(dsp_buf++);
-    in2=*(dsp_buf++);
-    in3=*(dsp_buf++);
-    
-    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in0,*(dsp_reverb_buf));
-    *(dsp_reverb_buf)++;
-    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in1,*(dsp_reverb_buf));
-    *(dsp_reverb_buf)++;
-    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in2,*(dsp_reverb_buf));
-    *(dsp_reverb_buf)++;
-    *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb,in3,*(dsp_reverb_buf));
-    *(dsp_reverb_buf)++;
+      in0 = *(dsp_buf++);
+      in1 = *(dsp_buf++);
+      in2 = *(dsp_buf++);
+      in3 = *(dsp_buf++);
 
-    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in0,*(dsp_chorus_buf));
-    *(dsp_chorus_buf)++;
-    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in1,*(dsp_chorus_buf));
-    *(dsp_chorus_buf)++;
-    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in2,*(dsp_chorus_buf));
-    *(dsp_chorus_buf)++;
-    *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus,in3,*(dsp_chorus_buf));
-    *(dsp_chorus_buf)++;
+      *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb, in0, *(dsp_reverb_buf));
+      *(dsp_reverb_buf)++;
+      *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb, in1, *(dsp_reverb_buf));
+      *(dsp_reverb_buf)++;
+      *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb, in2, *(dsp_reverb_buf));
+      *(dsp_reverb_buf)++;
+      *(dsp_reverb_buf) = FLUID_BUF_MAC(amp_reverb, in3, *(dsp_reverb_buf));
+      *(dsp_reverb_buf)++;
 
-    dsp_cnt--;
+      dsp_cnt--;
 //    __asm("BKPT 6");
+    }
   }
 
+  dsp_buf = voice->dsp_buf;
+
+  if (dsp_chorus_buf != NULL) {
+    dsp_cnt = (cnt >> 2);
+    while (dsp_cnt > 0)
+    {
+      in0 = *(dsp_buf++);
+      in1 = *(dsp_buf++);
+      in2 = *(dsp_buf++);
+      in3 = *(dsp_buf++);
+
+      *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus, in0, *(dsp_chorus_buf));
+      *(dsp_chorus_buf)++;
+      *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus, in1, *(dsp_chorus_buf));
+      *(dsp_chorus_buf)++;
+      *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus, in2, *(dsp_chorus_buf));
+      *(dsp_chorus_buf)++;
+      *(dsp_chorus_buf) = FLUID_BUF_MAC(amp_chorus, in3, *(dsp_chorus_buf));
+      *(dsp_chorus_buf)++;
+
+      dsp_cnt--;
+    }
+ }
   return cnt;
 }
 
@@ -792,7 +807,7 @@ uint32_t fluid_voice_calc_stereo(fluid_voice_t *voice,
 
     dsp_cnt--;
 //    __asm("BKPT 6");
-  }
+  } // 64 * 3 = 192 loop penalty (0.96us@200mhz)
   return cnt;
 }
 
@@ -979,6 +994,7 @@ fluid_voice_write(fluid_voice_t* voice,
   count = fluid_voice_calc(voice);
 
   fluid_voice_calc_stereo(voice, dsp_left_buf, dsp_right_buf, count);
+
   fluid_voice_calc_effects(voice,dsp_reverb_buf, dsp_chorus_buf, count);
 
   /* turn off voice if short count (sample ended and not looping) */

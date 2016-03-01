@@ -1739,11 +1739,11 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
    * enabled on synth level.  Nonexisting buffers are detected in the
    * DSP loop. Not sending the reverb / chorus signal saves some time
    * in that case. */
-//  reverb_buf = synth->with_reverb ? synth->fx_left_buf[0] : NULL;
-//  chorus_buf = synth->with_chorus ? synth->fx_left_buf[1] : NULL;
+  reverb_buf = synth->with_reverb ? synth->fx_left_buf[0] : NULL;
+  chorus_buf = synth->with_chorus ? synth->fx_left_buf[1] : NULL;
 
-  reverb_buf = synth->fx_left_buf[0];
-  chorus_buf = synth->fx_left_buf[1];
+//  reverb_buf = synth->fx_left_buf[0];
+//  chorus_buf = synth->fx_left_buf[1];
 
   /* call all playing synthesis processes */
   for (i = 0; i < synth->polyphony; i++) {
@@ -1776,17 +1776,17 @@ fluid_synth_one_block(fluid_synth_t* synth, int do_not_mix_fx_to_out)
      separately. */
 
     /* send to reverb */
-    if (synth->reverb != NULL) {
-      if (reverb_buf) {
+    if (synth->with_reverb) {
+      if (reverb_buf != NULL) {
         fluid_revmodel_processmix(synth->reverb, reverb_buf,
         synth->left_buf[0], synth->right_buf[0]);
       }
     }
 
     /* send to chorus */
-    if (synth->chorus != NULL) {
+    if (synth->with_chorus) {
 
-      if (chorus_buf) {
+      if (chorus_buf != NULL) {
         fluid_chorus_processmix(synth->chorus, chorus_buf,
                                 synth->left_buf[0], synth->right_buf[0]);
       }
