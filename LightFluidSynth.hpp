@@ -3,8 +3,10 @@
 
 #include "lfluidsynth.h"
 
-#define POLYPHONY 64
-#define SAMPLE_RATE 48000
+#define POLYPHONY 24 // standard GM
+//#define POLYPHONY 64
+//#define SAMPLE_RATE 48000
+#define SAMPLE_RATE 44100
 
 
 class LightFluidSynth {
@@ -22,8 +24,8 @@ public:
 
 //  fluid_settings_setstr(settings, "audio.period-size", "1024");
 
-    fluid_settings_setstr(settings, "synth.reverb.active", "yes");
-    fluid_settings_setstr(settings, "synth.chorus.active", "yes");
+//    fluid_settings_setstr(settings, "synth.reverb.active", "yes");
+//    fluid_settings_setstr(settings, "synth.chorus.active", "yes");
     fluid_settings_setint(settings, "synth.polyphony", POLYPHONY);
 
 //    fluid_settings_setstr(settings, "synth.verbose", "yes");

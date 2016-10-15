@@ -151,13 +151,16 @@ typedef fluid_sampledata_t fluid_sampledata;
 #else
 typedef short fluid_sampledata;
 #endif
+
 /*
  * fluid_sample_t
  */
 
 struct _fluid_sample_t
 {
+#ifndef FLUID_NO_NAMES
   char name[21];
+#endif
   uint32_t start;
   uint32_t end;	/* Note: Index of last valid sample point (contrary to SF spec) */
   uint32_t loopstart;

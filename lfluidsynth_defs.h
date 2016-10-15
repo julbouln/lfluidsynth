@@ -3,11 +3,15 @@
 
 #define FLUID_BUFSIZE 256
 
+#define FLUID_CHUNK_BUFSIZE 1024
 #define FLUID_SAMPLE_MAX_MEM 8388608 // 8 MB
+//#define FLUID_SAMPLE_MAX_MEM 131072 // 128k
 
 #define FLUID_SAMPLE_READ_CHUNK_SIZE 4096
+//#define FLUID_SAMPLE_READ_CHUNK_SIZE 512
 //#define FLUID_SAMPLE_READ_CHUNK_SIZE 16384
 //#define FLUID_SAMPLE_READ_CHUNK_SIZE 65536
+//#define FLUID_SAMPLE_READ_CHUNK_SIZE 131072
 
 //#define FLUID_CALC_INTERPOLATE_LINEAR
 
@@ -28,6 +32,7 @@ typedef FILE*  fluid_file;
 #define FLUID_FTELL(_f)				 ftell(_f)
 #define FLUID_FEOF(_f)				 feof(_f)
 #define FLUID_REWIND(_f)			 rewind(_f)
+#define FLUID_MMAP(_i)				 
 
 #define FLUID_MEMCPY(_dst,_src,_n)   memcpy(_dst,_src,_n)
 #define FLUID_MEMSET(_s,_c,_n)       memset(_s,_c,_n)

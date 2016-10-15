@@ -1,9 +1,12 @@
 FLUIDSYNTH_OBJS=$(patsubst %.c,%.o,$(wildcard src/*.c))
 # fluidsynth/drivers/fluid_alsa.o fluidsynth/drivers/fluid_pulse.o
-CFLAGS=-O3 -g -I. -Isrc
-CFLAGS+= -DFLUID_CALC_FORMAT_FLOAT -DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC -DFLUID_NEW_GEN_API 
-CFLAGS += -DFLUID_NEW_VOICE_MOD_API
+CFLAGS=-O3 -g -I. -Isrc -D_GNU_SOURCE
+CFLAGS += -DFLUID_CALC_FORMAT_FLOAT -DFLUID_NEW_GEN_API 
+CFLAGS += -DFLUID_NO_NAMES -DFLUID_ALTSFONT
+#CFLAGS += -DFLUID_SAMPLE_STREAM # TODO linux
+CFLAGS +=-DFLUID_SAMPLE_READ_DISK -DFLUID_SAMPLE_GC 
 CFLAGS += -DFLUID_SAMPLE_READ_CHUNK
+CFLAGS += -DFLUID_NEW_VOICE_MOD_API
 CFLAGS += -DFLUID_BUFFER_S16
 #CFLAGS += -DFLUID_ARM_OPT 
 #CFLAGS+=-march=native
@@ -11,7 +14,7 @@ CFLAGS += -DFLUID_BUFFER_S16
 SYNTH_CFLAGS=-Irt -D__LINUX_ALSA__ 
 
 # for massif and callgrind
-SF2_PROF_FILE=merlin.sf2
+SF2_PROF_FILE=ct4mgm.sf2
 
 all: $(FLUIDSYNTH_OBJS)
 	g++ $(CFLAGS) $(SYNTH_CFLAGS) rt/RtMidi.cpp rt/RtAudio.cpp synth.cpp -o synth $^ -lc -lm -lpthread -lasound
@@ -27,6 +30,9 @@ timgm6mb.sf2:
 test: timgm6mb.sf2 $(FLUIDSYNTH_OBJS)
 	gcc $(CFLAGS) test.c -o test $(FLUIDSYNTH_OBJS) -lc -lm
 
+test_altsfont: $(FLUIDSYNTH_OBJS)
+	gcc $(CFLAGS) test_altsfont.c -o test_altsfont $(FLUIDSYNTH_OBJS) -lc -lm
+
 callgrind: synth
 	pasuspender -- valgrind --dsymutil=yes --tool=callgrind --dump-instr=yes --collect-jumps=yes ./synth $(SF2_PROF_FILE)
 
@@ -36,6 +42,10 @@ massif: synth
 
 test_massif: test
 	valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./test
+	ms_print massif.out > massif.log
+
+test_altsfont_massif: test_altsfont
+	valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./test_altsfont
 	ms_print massif.out > massif.log
 
 clean:

@@ -831,6 +831,11 @@ fluid_voice_calc(fluid_voice_t *voice)
   uint64_t loop_size = voice->loop_size;
   int32_t in0,in1,in2,in3;
 
+#ifdef FLUID_SAMPLE_STREAM
+//   int16_t chunk[FLUID_CHUNK_BUFSIZE];
+   int16_t *buf;
+
+#else
 #ifdef FLUID_SAMPLE_READ_DISK
   int16_t *buf = voice->sample->data->buf - voice->start;
 #else
@@ -840,7 +845,7 @@ fluid_voice_calc(fluid_voice_t *voice)
 #ifdef FLUID_CALC_INTERPOLATE_LINEAR
   fluid_real_t *coeffs;
 #endif
-
+#endif
   /*
   #ifdef FLUID_CALC_INTERPOLATE_LINEAR
   #define __INTERPOLATE(i) \
@@ -852,13 +857,18 @@ fluid_voice_calc(fluid_voice_t *voice)
 
   /*loop Unrolling */
   dsp_cnt = FLUID_BUFSIZE >> 2;
-
   dsp_phase_index = dsp_phase >> 32;
+
+#ifdef FLUID_SAMPLE_STREAM
+//   sfont_read_sample_buf(voice->sample,chunk,dsp_phase_index,FLUID_CHUNK_BUFSIZE);
+//   buf=chunk - dsp_phase_index;
+
+  buf=sfont_sample_mmap(voice->sample,0);
+#endif
 
   while (dsp_cnt > 0)
   {
 //    __asm("BKPT 1");
-
 
       in0 = FLUID_BUF_SAMPLE(*(buf + dsp_phase_index));
       dsp_phase += dsp_phase_incr;
@@ -893,6 +903,14 @@ fluid_voice_calc(fluid_voice_t *voice)
       {
         dsp_phase -= loop_size;
         voice->has_looped = 1;
+
+#ifdef FLUID_SAMPLE_STREAM
+        dsp_phase_index = dsp_phase >> 32;
+  //      sfont_read_sample_buf(voice->sample,chunk,dsp_phase_index,FLUID_CHUNK_BUFSIZE);
+    //    buf = chunk - dsp_phase_index;
+
+#endif
+
       } else {
         break;
       }
@@ -901,6 +919,7 @@ fluid_voice_calc(fluid_voice_t *voice)
     dsp_cnt--;
 //    __asm("BKPT 2");
   }
+//  printf("last phase %d\n",dsp_phase_index);
 
 
   voice->phase = dsp_phase;
@@ -930,7 +949,10 @@ fluid_voice_write(fluid_voice_t* voice,
     return FLUID_OK;
   }
 
+#ifdef FLUID_SAMPLE_STREAM
+#else
   if (voice->sample->data == NULL) return FLUID_OK;
+#endif
 
   /* make sure we're playing and that we have sample data */
   if (!_PLAYING(voice)) return FLUID_OK;
@@ -963,7 +985,7 @@ fluid_voice_write(fluid_voice_t* voice,
 
 //  fluid_voice_calc_resonant_filter(voice);
 
-  /*********************** run the dsp chain ************************
+  /*********************** run the dsp chain ************************sampledata
    * The sample is mixed with the output buffer.
    * The buffer has to be filled from 0 to FLUID_BUFSIZE-1.
    * Depending on the position in the loop and the loop size, this
@@ -971,9 +993,12 @@ fluid_voice_write(fluid_voice_t* voice,
 
   voice->dsp_buf = dsp_buf;
 
+#ifdef FLUID_SAMPLE_STREAM
+#else
 #ifdef FLUID_SAMPLE_READ_DISK
   uint32_t sample_index = (voice->phase >> 32) - voice->start;
   fluid_sampledata_read(voice->sample->data, voice->start, voice->end, sample_index, FLUID_SAMPLE_READ_CHUNK_SIZE);
+#endif
 #endif
 
   /* voice is currently looping? */
@@ -1963,10 +1988,12 @@ fluid_voice_off(fluid_voice_t* voice)
   /* Decrement the reference count of the sample. */
   if (sample) {
     fluid_sample_decr_ref(sample);
-#ifdef FLUID_SAMPLE_READ_DISK
 //    printf("voice %d\n",voice->sample->refcount);
+#ifdef FLUID_SAMPLE_READ_DISK
     if (sample->refcount == 0) {
+//      printf("sample not needed anymore %d %d-%d\n",sample->refcount,sample->start,sample->end);
 //      voice->sample->data->last_time=voice->start_time;
+
 #ifndef FLUID_SAMPLE_GC
       fluid_sampledata_reset(sample->data);
 #endif
@@ -2363,6 +2390,7 @@ int fluid_voice_optimize_sample(fluid_sample_t* s)
   fluid_real_t normalized_amplitude_during_loop;
   fluid_real_t result;
   int i;
+
 
 
   /* ignore ROM and other(?) invalid samples */

@@ -253,7 +253,7 @@ int fluid_midi_file_eot(fluid_midi_file* mf)
 {
 #if DEBUG
 	if (mf->trackpos > mf->tracklen) {
-		printf("track overrun: %d > %d\n", mf->trackpos, mf->tracklen);
+//		printf("track overrun: %d > %d\n", mf->trackpos, mf->tracklen);
 	}
 #endif
 	return mf->eot || (mf->trackpos >= mf->tracklen);

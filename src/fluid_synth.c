@@ -347,8 +347,8 @@ new_fluid_synth(fluid_settings_t *settings)
 
   synth->settings = settings;
 
-  synth->with_reverb = fluid_settings_str_equal(settings, "synth.reverb.active", "yes");
-  synth->with_chorus = fluid_settings_str_equal(settings, "synth.chorus.active", "yes");
+  synth->with_reverb = fluid_settings_str_equal(settings, "synth.reverb.active", "no");
+  synth->with_chorus = fluid_settings_str_equal(settings, "synth.chorus.active", "no");
   synth->verbose = fluid_settings_str_equal(settings, "synth.verbose", "yes");
   synth->dump = fluid_settings_str_equal(settings, "synth.dump", "yes");
 
@@ -424,7 +424,11 @@ new_fluid_synth(fluid_settings_t *settings)
   synth->tuning = NULL;
 
   /* allocate and add the default sfont loader */
+  #ifdef FLUID_ALTSFONT
+  loader = new_fluid_altsfloader();
+  #else
   loader = new_fluid_defsfloader();
+  #endif
 
   if (loader == NULL) {
     FLUID_LOG(FLUID_WARN, "Failed to create the default SoundFont loader");
@@ -515,6 +519,7 @@ new_fluid_synth(fluid_settings_t *settings)
   synth->cur = FLUID_BUFSIZE;
 
   if(synth->with_reverb) {
+//    printf("WITH REVERB %d\n",synth->with_reverb);
   /* allocate the reverb module */
   synth->reverb = new_fluid_revmodel();
   if (synth->reverb == NULL) {
@@ -530,6 +535,7 @@ new_fluid_synth(fluid_settings_t *settings)
 }
 
   if(synth->with_chorus) {
+//    printf("WITH CHORUS %d\n",synth->with_chorus);
   /* allocate the chorus module */
   synth->chorus = new_fluid_chorus(synth->sample_rate);
   if (synth->chorus == NULL) {

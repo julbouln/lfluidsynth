@@ -132,6 +132,7 @@ typedef struct _fluid_sfloader_t fluid_sfloader_t;
 typedef struct _fluid_sfont_t fluid_sfont_t;
 typedef struct _fluid_preset_t fluid_preset_t;
 typedef struct _fluid_sample_t fluid_sample_t;
+typedef struct _fluid_sample_chunk_t fluid_sample_chunk_t;
 typedef struct _fluid_mod_t fluid_mod_t;
 typedef struct _fluid_audio_driver_t fluid_audio_driver_t;
 typedef struct _fluid_player_t fluid_player_t;

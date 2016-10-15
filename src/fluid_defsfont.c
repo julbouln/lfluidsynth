@@ -426,7 +426,7 @@ static void fluid_sampledata_read_chunk(fluid_sampledata_t *s, uint32_t index, u
 //  uint32_t t1, t2;
 //      t1=HAL_GetTick();
   if (clip_size > 0) {
-    //    printf("fluid_sampledata_read_chunk: read %x %d %d / %d %d\n",s,index,size,s->read_index,clip_size);
+//        printf("fluid_sampledata_read_chunk: read %x %d %d / %d %d\n",s,index,size,s->read_index,clip_size);
     FLUID_FSEEK(s->fd, (s->start_index + s->read_index) * 2, SEEK_SET);
     int n = FLUID_FREAD((uint8_t*)s->buf + (s->read_index * 2), 1, clip_size * 2, s->fd);
     s->read_index += (clip_size);
@@ -573,9 +573,13 @@ fluid_sample_t* fluid_defsfont_get_sample(fluid_defsfont_t* sfont, char *s)
 
     sample = (fluid_sample_t*) fluid_list_get(list);
 
+#ifndef FLUID_NO_NAMES
+
     if (FLUID_STRCMP(sample->name, s) == 0) {
       return sample;
     }
+#endif
+
   }
 
   return NULL;
@@ -1869,7 +1873,9 @@ fluid_sample_in_rom(fluid_sample_t* sample)
 int
 fluid_sample_import_sfont(fluid_sample_t* sample, SFSample* sfsample, fluid_defsfont_t* sfont)
 {
+#ifndef FLUID_NO_NAMES
   FLUID_STRCPY(sample->name, sfsample->name);
+#endif
 
 #ifdef FLUID_SAMPLE_READ_DISK
   sample->data = (fluid_sampledata*) FLUID_MALLOC(sizeof(fluid_sampledata));
@@ -1888,11 +1894,15 @@ fluid_sample_import_sfont(fluid_sample_t* sample, SFSample* sfsample, fluid_defs
 
   if (sample->sampletype & FLUID_SAMPLETYPE_ROM) {
     sample->valid = 0;
+#ifndef FLUID_NO_NAMES
     FLUID_LOG(FLUID_WARN, "Ignoring sample %s: can't use ROM samples", sample->name);
+#endif
   }
   if (sample->end - sample->start < 8) {
     sample->valid = 0;
+#ifndef FLUID_NO_NAMES
     FLUID_LOG(FLUID_WARN, "Ignoring sample %s: too few sample data points", sample->name);
+#endif
   } else {
 /*      if (sample->loopstart < sample->start + 8) { */
 /*        FLUID_LOG(FLUID_WARN, "Fixing sample %s: at least 8 data points required before loop start", sample->name);     */

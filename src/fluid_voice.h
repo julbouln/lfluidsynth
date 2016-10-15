@@ -81,6 +81,11 @@ struct _fluid_voice_t
 	uint8_t mod_count;
 	uint8_t has_looped;                 /* Flag that is set as soon as the first loop is completed. */
 	fluid_sample_t* sample;
+
+#ifdef FLUID_SAMPLE_CHUNKED
+	fluid_sample_chunk_t* sample_chunk;
+#endif
+	
 	uint8_t check_sample_sanity_flag;   /* Flag that initiates, that sample-related parameters
 					   have to be checked. */
 
