@@ -20,6 +20,9 @@ int main() {
   printf("FLUID_NUM_MOD (%d) * sizeof(fluid_mod_t) %d\n",FLUID_NUM_MOD,FLUID_NUM_MOD*sizeof(fluid_mod_t));
   printf("sizeof(fluid_mod_t) %d\n",sizeof(fluid_mod_t));
   printf("sizeof(fluid_voice_t) %d\n",sizeof(fluid_voice_t));
+  printf("sizeof(fluid_synth_t) %d\n",sizeof(fluid_synth_t));
+//  printf("sizeof(fluid_chorus_t) %d\n",sizeof(fluid_chorus_t));
+//  printf("sizeof(fluid_rev_t) %d\n",sizeof(fluid_rev_t));
 
 	/* Create the settings. */
 	settings = new_fluid_settings();

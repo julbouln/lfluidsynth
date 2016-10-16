@@ -510,15 +510,6 @@ fluid_defsfont_load_sampledata(fluid_defsfont_t* sfont)
   fluid_sampledata_init(sfont->sampledata,fd);
 
 #else
-#ifdef FLUID_SAMPLE_READ_MMAP
-  FLUID_FCLOSE(fd);
-
-  int lfd, offset;
-  lfd = open(sfont->filename, O_RDONLY);
-
-  sfont->sampledata = mmap((caddr_t)0, sfont->samplesize, PROT_READ, MAP_SHARED, lfd, 0);
-
-#else
 
   sfont->sampledata = (short*) FLUID_MALLOC(sfont->samplesize);
   if (sfont->sampledata == NULL) {
@@ -556,7 +547,6 @@ fluid_defsfont_load_sampledata(fluid_defsfont_t* sfont)
       sfont->sampledata[i] = s;
     }
   }
-#endif
 #endif
   return FLUID_OK;
 }

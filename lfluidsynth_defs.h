@@ -3,7 +3,6 @@
 
 #define FLUID_BUFSIZE 256
 
-#define FLUID_CHUNK_BUFSIZE 1024
 #define FLUID_SAMPLE_MAX_MEM 8388608 // 8 MB
 //#define FLUID_SAMPLE_MAX_MEM 131072 // 128k
 
@@ -32,7 +31,8 @@ typedef FILE*  fluid_file;
 #define FLUID_FTELL(_f)				 ftell(_f)
 #define FLUID_FEOF(_f)				 feof(_f)
 #define FLUID_REWIND(_f)			 rewind(_f)
-#define FLUID_MMAP(_i)				 
+#include <sys/mman.h>
+#define	FLUID_MMAP(_p,_s,_f)		mmap(0, _s, PROT_READ, MAP_SHARED, fileno(_f), 0)
 
 #define FLUID_MEMCPY(_dst,_src,_n)   memcpy(_dst,_src,_n)
 #define FLUID_MEMSET(_s,_c,_n)       memset(_s,_c,_n)

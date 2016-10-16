@@ -31,7 +31,6 @@ sf2_preset *sf2_preset_get(fluid_list_t *presets, uint16_t num) {
 	return NULL;
 }
 
-
 sf2_inst *sf2_inst_get(sf2 *sf, uint16_t id) {
 	sf2_inst *inst;
 	fluid_list_t *p = sf->insts;
@@ -80,9 +79,7 @@ riff_handle *sf2_open(char *filename) {
 	}
 
 	return rh;
-
 }
-
 
 void sf2_init_rec(sf2 *sf) {
 	riff_handle *rh = sf->rh;
@@ -93,7 +90,6 @@ void sf2_init_rec(sf2 *sf) {
 	while (1) {
 		//if current chunk not a chunk list
 		if (strcmp(rh->c_id, "LIST") != 0  &&  strcmp(rh->c_id, "RIFF") != 0) {
-//			printf("%s : %d\n", rh->c_id, rh->c_pos_start);
 			switch (CID(rh->c_id[0], rh->c_id[1], rh->c_id[2], rh->c_id[3])) {
 			case CID_ifil:
 				sf->ifil_pos = rh->c_pos_start;
@@ -150,8 +146,6 @@ void sf2_init_rec(sf2 *sf) {
 			break;
 		}
 		else if (err < RIFF_ERROR_CRITICAL  &&  err != RIFF_ERROR_NONE) {
-			//printf("last chunk in level %d %d .. %d %s\n", rh->ls_level, rh->c_pos_start, rh->c_pos_start + 8 + rh->c_size + rh->pad, rh->c_id);
-
 			//go back from sub level
 			riff_levelParent(rh);
 			//file pos has not changed by going a level back, we are now within that parent's data
@@ -179,7 +173,6 @@ void sf2_load_presets(sf2 *sf) {
 
 	// init presets
 	for (pos = 0; pos < rh->c_size - phdr_size; pos += phdr_size) {
-
 		sfPresetHeader phdr;
 		riff_seekInChunk(rh, pos);
 		riff_readInChunk(rh, &phdr, phdr_size);
@@ -187,7 +180,6 @@ void sf2_load_presets(sf2 *sf) {
 		sfPresetHeader n_phdr;
 		riff_seekInChunk(rh, pos + phdr_size);
 		riff_readInChunk(rh, &n_phdr, phdr_size);
-//		printf("%s %d %d %d (%d)\n", phdr.achPresetName, phdr.wPreset, phdr.wBank, phdr.wPresetBagNdx * 4, n_phdr.wPresetBagNdx - phdr.wPresetBagNdx);
 
 		sf2_preset *preset;
 		preset = FLUID_NEW(sf2_preset);
@@ -197,7 +189,6 @@ void sf2_load_presets(sf2 *sf) {
 
 		sf2_bank *bank = sf2_bank_get(sf->banks, phdr.wBank);
 		if (!bank) {
-//			printf("ADD BANK %d\n", phdr.wBank);
 			bank = FLUID_NEW(sf2_bank);
 			bank->num = phdr.wBank;
 			bank->presets = NULL;
@@ -210,10 +201,6 @@ void sf2_load_presets(sf2 *sf) {
 		preset->global_preset_zone = NULL;
 		preset->parsed = 0;
 		bank->presets = fluid_list_append(bank->presets, preset);
-
-//		if (phdr.wBank == bank) {
-//			bank_presets[phdr.wPreset] = preset;
-//		}
 	}
 }
 
@@ -229,19 +216,15 @@ void sf2_parse_sample(sf2 *sf, sf2_inst_zone *isz, uint16_t id) {
 	riff_readInChunk(rh, &shdr, shdr_size);
 
 	sample = FLUID_NEW(fluid_sample_t);
+//	sample->refcount=0;
 
 //  FLUID_STRCPY(sample->name, shdr.achSampleName);
-#ifdef FLUID_SAMPLE_STREAM
-#else
 #ifdef FLUID_SAMPLE_READ_DISK
 	sample->data = (fluid_sampledata*) FLUID_MALLOC(sizeof(fluid_sampledata));
 	fluid_sampledata_init(sample->data, sf->sampledata->fd);
 #else
 	sample->data = sf->sampledata;
 #endif
-#endif
-
-//	printf("LOAD SAMPLE %d %s %d-%d\n", id, shdr.achSampleName,shdr.dwStart,shdr.dwEnd);
 
 	sample->userdata = sf;
 
@@ -257,33 +240,6 @@ void sf2_parse_sample(sf2 *sf, sf2_inst_zone *isz, uint16_t id) {
 	isz->sample = sample;
 }
 
-#ifdef FLUID_SAMPLE_STREAM
-uint16_t *sfont_sample_mmap(fluid_sample_t *sample, uint32_t index) {
-	sf2 *sf = (sf2 *)sample->userdata;
-	return (uint16_t *)FLUID_MMAP(index + sf->smpl_pos);
-}
-#endif
-void sfont_read_sample_buf(fluid_sample_t *sample, int16_t *buf, uint32_t index, uint32_t size) {
-	sf2 *sf = (sf2 *)sample->userdata;
-	riff_handle *rh = sf->rh;
-//	riff_seek(rh, sf->smpl_pos);
-
-	uint32_t clip_size = size;
-
-
-	if (index + size > sample->end) {
-		clip_size = sample->end - index;
-//		printf("clip %d > %d : %d -> %d\n",start_pos + size,sample->end,size,clip_size);
-	}
-
-//	printf("read chunk %d %d(%d-%d) %d : %d\n",sf->smpl_pos,index,sample->start,sample->end,size,index+size);
-
-//	riff_seekInChunk(rh, index*2);
-//	riff_readInChunk(rh, (uint8_t *)buf, clip_size*2);
-	FLUID_FSEEK((fluid_file)(rh->fh), index * 2 + sf->smpl_pos, SEEK_SET);
-	int n = FLUID_FREAD((uint8_t*)buf, 1, clip_size * 2, (fluid_file)(rh->fh));
-}
-
 void sf2_load_inst(sf2 *sf, uint16_t id, sf2_inst *is) {
 	riff_handle *rh = sf->rh;
 	size_t pos = id * inst_size;
@@ -292,12 +248,10 @@ void sf2_load_inst(sf2 *sf, uint16_t id, sf2_inst *is) {
 	sfInst inst;
 	riff_seekInChunk(rh, pos);
 	riff_readInChunk(rh, &inst, inst_size);
-//	printf("INST BAG %d\n",inst.wInstBagNdx);
 
 	sfInst n_inst;
 	riff_seekInChunk(rh, pos + inst_size);
 	riff_readInChunk(rh, &n_inst, inst_size);
-//	printf("INST BAG %d %d\n", inst.wInstBagNdx * ibag_size, n_inst.wInstBagNdx * ibag_size - inst.wInstBagNdx * ibag_size);
 	is->id = id;
 	is->bags_pos = inst.wInstBagNdx * ibag_size;
 	is->bags_size = n_inst.wInstBagNdx * ibag_size - inst.wInstBagNdx * ibag_size;
@@ -305,20 +259,17 @@ void sf2_load_inst(sf2 *sf, uint16_t id, sf2_inst *is) {
 	is->global_inst_zone = NULL;
 	is->parsed = 0;
 	sf->insts = fluid_list_append(sf->insts, is);
-
 }
 
 void sf2_parse_inst(sf2 *sf, sf2_inst *is) {
 	riff_handle *rh = sf->rh;
 	size_t pos;
-//	printf("Inst %d (%d)\n", is->bags_pos, is->bags_size);
 
 	for (pos = is->bags_pos; pos < is->bags_pos + is->bags_size; pos += ibag_size) {
 		sfInstBag ibag;
 		riff_seek(rh, sf->ibag_pos);
 		riff_seekInChunk(rh, pos);
 		riff_readInChunk(rh, &ibag, ibag_size);
-//		printf("IBAG %d %d\n", ibag.wInstGenNdx, ibag.wInstModNdx);
 		sfInstBag n_ibag;
 		riff_seekInChunk(rh, pos + ibag_size);
 		riff_readInChunk(rh, &n_ibag, ibag_size);
@@ -341,11 +292,9 @@ void sf2_parse_inst(sf2 *sf, sf2_inst *is) {
 		for (curGen = 0; curGen < igen_count; curGen += igen_size) {
 			riff_seekInChunk(rh, ibag.wInstGenNdx * igen_size + curGen);
 			riff_readInChunk(rh, &igen, igen_size);
-//			printf("%d %d-%d\n", igen.sfGenOper, igen.genAmount.ranges.byLo, igen.genAmount.ranges.byHi);
 			switch (igen.sfGenOper) {
 			case SFGEN_sampleID:
 				global = 0;
-//				printf("FOUND SAMPLE %d\n", igen.genAmount.wAmount);
 				if (!isz->sample)
 					sf2_parse_sample(sf, isz, igen.genAmount.wAmount);
 				break;
@@ -386,13 +335,11 @@ void sf2_parse_preset(sf2 *sf, sf2_preset *ps) {
 	riff_handle *rh = sf->rh;
 	size_t pos;
 
-//	printf("PARSE PRESET %d\n", ps->num);
 	for (pos = ps->bags_pos; pos < ps->bags_pos + ps->bags_size; pos += pbag_size) {
 		sfPresetBag pbag;
 		riff_seek(rh, sf->pbag_pos);
 		riff_seekInChunk(rh, pos);
 		riff_readInChunk(rh, &pbag, pbag_size);
-//		printf("PBAG %d %d\n", pbag.wGenNdx, pbag.wModNdx);
 		sfPresetBag n_pbag;
 		riff_seekInChunk(rh, pos + pbag_size);
 		riff_readInChunk(rh, &n_pbag, pbag_size);
@@ -415,11 +362,9 @@ void sf2_parse_preset(sf2 *sf, sf2_preset *ps) {
 		for (curGen = 0; curGen < pgen_count; curGen += pgen_size) {
 			riff_seekInChunk(rh, pbag.wGenNdx * pgen_size + curGen);
 			riff_readInChunk(rh, &pgen, pgen_size);
-//			printf("%d %d-%d\n", pgen.sfGenOper, pgen.genAmount.ranges.byLo, pgen.genAmount.ranges.byHi);
 			switch (pgen.sfGenOper) {
 			case SFGEN_instrument:
 				global = 0;
-//				printf("FOUND INSTRUMENT %d\n", pgen.genAmount.wAmount);
 				sf2_inst *inst = sf2_inst_get(sf, pgen.genAmount.wAmount);
 				if (!inst) {
 					inst = FLUID_NEW(sf2_inst);
@@ -450,7 +395,6 @@ void sf2_parse_preset(sf2 *sf, sf2_preset *ps) {
 					gen->val = (fluid_real_t) pgen.genAmount.shAmount;
 					gen->flags = GEN_SET;
 				}
-
 				break;
 			}
 		}
@@ -486,7 +430,7 @@ void sf2_delete_inst_zone(sf2_inst_zone *inst_zone) {
 		list = next;
 	}
 
-	if(inst_zone->sample)
+	if (inst_zone->sample)
 		FLUID_FREE(inst_zone->sample);
 	FLUID_FREE(inst_zone);
 }
@@ -501,7 +445,7 @@ void sf2_delete_inst(sf2_inst *inst) {
 		list = next;
 	}
 
-	if(inst->global_inst_zone)
+	if (inst->global_inst_zone)
 		sf2_delete_inst_zone(inst->global_inst_zone);
 	FLUID_FREE(inst);
 }
@@ -516,7 +460,7 @@ void sf2_delete_preset(sf2_preset *preset) {
 		list = next;
 	}
 
-	if(preset->global_preset_zone)
+	if (preset->global_preset_zone)
 		sf2_delete_preset_zone(preset->global_preset_zone);
 	FLUID_FREE(preset);
 }
@@ -601,7 +545,6 @@ int fluid_altpreset_preset_get_num(fluid_preset_t* preset)
 	return sfpreset->num;
 }
 
-
 int
 fluid_altpreset_preset_noteon(fluid_preset_t* preset, fluid_synth_t* synth, int chan, int key, int vel)
 {
@@ -615,7 +558,7 @@ fluid_altpreset_preset_noteon(fluid_preset_t* preset, fluid_synth_t* synth, int 
 	int mod_list_count;
 	int i;
 
-	if(!sfpreset)
+	if (!sfpreset)
 		return 0;
 
 	if (!sfpreset->parsed)
@@ -626,9 +569,7 @@ fluid_altpreset_preset_noteon(fluid_preset_t* preset, fluid_synth_t* synth, int 
 
 	while (pzone != NULL) {
 		sf2_preset_zone *psz = (sf2_preset_zone*)pzone->data;
-//		printf("PRESET ZONE %d %d\n", psz->keylo, psz->keyhi);
 		if (sf2_preset_zone_inside_range(psz, key, vel)) {
-//			printf("PRESET INSIDE %d\n", sfpreset->num);
 			sf2_inst *inst = psz->inst;
 			if (inst) {
 				fluid_list_t *izone = inst->inst_zones;
@@ -636,9 +577,7 @@ fluid_altpreset_preset_noteon(fluid_preset_t* preset, fluid_synth_t* synth, int 
 
 				while (izone != NULL) {
 					sf2_inst_zone *isz = (sf2_inst_zone*)izone->data;
-//					printf("INST ZONE %d %d\n", isz->keylo, isz->keyhi);
 					if (sf2_inst_zone_inside_range(isz, key, vel)) {
-//						printf("INST INSIDE %d\n", inst->id);
 						if (isz->sample) {
 							voice = fluid_synth_alloc_voice(synth, isz->sample, chan, key, vel);
 							if (voice == NULL) {
@@ -726,19 +665,11 @@ fluid_altpreset_preset_noteon(fluid_preset_t* preset, fluid_synth_t* synth, int 
 
 							fluid_synth_start_voice(synth, voice);
 
-						} else {
-//							printf("NO SAMPLE FOR INSTRUMENT ZONE %d\n", inst->id);
-
 						}
 					}
 					izone = fluid_list_next(izone);
 				}
-			} else {
-//				printf("NO INSTRUMENT FOR PRESET ZONE %d\n", sfpreset->num);
-//				return;
 			}
-
-
 		}
 		pzone = fluid_list_next(pzone);
 	}
@@ -765,11 +696,11 @@ char* fluid_altsfont_sfont_get_name(fluid_sfont_t* sfont)
 
 int fluid_altpreset_preset_delete(fluid_preset_t* preset)
 {
-  FLUID_FREE(preset);
+	FLUID_FREE(preset);
 
-  /* TODO: free modulators */
+	/* TODO: free modulators */
 
-  return 0;
+	return 0;
 }
 
 fluid_preset_t*
@@ -787,7 +718,6 @@ fluid_altsfont_sfont_get_preset(fluid_sfont_t* sfont, unsigned int bank, unsigne
 
 	sfpreset = sf2_bank_preset_get(sf, bank, prenum);
 
-
 	preset->sfont = sfont;
 	preset->data = sfpreset;
 	preset->free = fluid_altpreset_preset_delete;
@@ -799,9 +729,6 @@ fluid_altsfont_sfont_get_preset(fluid_sfont_t* sfont, unsigned int bank, unsigne
 
 	return preset;
 }
-
-
-
 
 int delete_fluid_altsfloader(fluid_sfloader_t* loader)
 {
@@ -832,27 +759,10 @@ fluid_sfont_t* fluid_altsfloader_load(fluid_sfloader_t* loader, const char* file
 	sf->samplepos = sf->smpl_pos;
 	sf->samplesize = rh->c_size;
 
-//	printf("LOAD SAMPLES %d(%d) %d\n",sf->smpl_pos,sf->samplesize);
-
-//	printf("LOAD SAMPLES %d %d\n",sf->samplepos,sf->samplesize);
-
-/*
-	fluid_file fd;
-	unsigned short endian;
-	fd = FLUID_FOPEN(sf->filename, "rb");
-	if (fd == NULL) {
-		FLUID_LOG(FLUID_ERR, "Can't open soundfont file");
-		return FLUID_FAILED;
-	}
-	if (FLUID_FSEEK(fd, sf->samplepos, SEEK_SET) == -1) {
-		perror("error");
-		FLUID_LOG(FLUID_ERR, "Failed to seek position in data file");
-		return FLUID_FAILED;
-	}
-*/
 	fluid_file fd = rh->fh;
 
-#ifdef FLUID_SAMPLE_STREAM
+#ifdef FLUID_SAMPLE_MMAP
+	sf->sampledata=(int16_t *)FLUID_MMAP(sf->samplepos, sf->samplesize, fd);
 #else
 #ifdef FLUID_SAMPLE_READ_DISK
 	sf->sampledata = (fluid_sampledata*) FLUID_MALLOC(sizeof(fluid_sampledata));
@@ -879,7 +789,6 @@ fluid_sfont_t* fluid_altsfloader_load(fluid_sfloader_t* loader, const char* file
 	return sfont;
 }
 
-
 fluid_sfloader_t* new_fluid_altsfloader()
 {
 	fluid_sfloader_t* loader;
@@ -896,5 +805,3 @@ fluid_sfloader_t* new_fluid_altsfloader()
 
 	return loader;
 }
-
-

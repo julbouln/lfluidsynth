@@ -220,8 +220,8 @@ typedef struct sf2 {
   fluid_list_t *banks;
 
   fluid_sampledata* sampledata;        /* the sample data, loaded in ram */
-  unsigned int samplepos;   /* the position in the file at which the sample data starts */
-  unsigned int samplesize;  /* the size of the sample data */
+  uint32_t samplepos;   /* the position in the file at which the sample data starts */
+  uint32_t samplesize;  /* the size of the sample data */
 
   char *filename;
 } sf2;
@@ -279,7 +279,4 @@ typedef struct sf2_preset {
 } sf2_preset;
 
 
-#ifdef FLUID_SAMPLE_STREAM
-uint16_t *sfont_sample_mmap(fluid_sample_t *sample, uint32_t index);
-#endif
 #endif

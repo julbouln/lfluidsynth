@@ -200,18 +200,16 @@ int riff_readChunkHeader(riff_handle *rh){
 		listend = rh->pos_start + RIFF_CHUNK_DATA_OFFSET + rh->h_size;
 	
 	if(cposend > listend){
-		if(rh->fp_printf) {
+		if(rh->fp_printf)
 			rh->fp_printf("Chunk size exceeds list size! At least one size value must be corrupt!");
-		}
 		//chunk data must be considered as cut off, better skip this chunk
 		return RIFF_ERROR_ICSIZE;
 	}
 	
 	//check chunk size against file size
 	if((rh->size > 0)  &&  (cposend > rh->size)){
-		if(rh->fp_printf) {
+		if(rh->fp_printf)
 			rh->fp_printf("Chunk size exceeds file size! At least one size value must be corrupt!");
-		}
 		return RIFF_ERROR_EOF; //Or better RIFF_ERROR_ICSIZE?
 	}
 	

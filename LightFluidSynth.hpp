@@ -3,7 +3,8 @@
 
 #include "lfluidsynth.h"
 
-#define POLYPHONY 24 // standard GM
+//#define POLYPHONY 24 // standard GM
+#define POLYPHONY 32
 //#define POLYPHONY 64
 //#define SAMPLE_RATE 48000
 #define SAMPLE_RATE 44100
