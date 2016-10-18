@@ -347,8 +347,8 @@ new_fluid_synth(fluid_settings_t *settings)
 
   synth->settings = settings;
 
-  synth->with_reverb = fluid_settings_str_equal(settings, "synth.reverb.active", "no");
-  synth->with_chorus = fluid_settings_str_equal(settings, "synth.chorus.active", "no");
+  synth->with_reverb = fluid_settings_str_equal(settings, "synth.reverb.active", "yes");
+  synth->with_chorus = fluid_settings_str_equal(settings, "synth.chorus.active", "yes");
   synth->verbose = fluid_settings_str_equal(settings, "synth.verbose", "yes");
   synth->dump = fluid_settings_str_equal(settings, "synth.dump", "yes");
 

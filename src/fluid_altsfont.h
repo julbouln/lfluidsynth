@@ -5,6 +5,7 @@
 
 #include "riff.h"
 
+#include "fluid_mod.h"
 #include "fluid_types.h"
 #include "fluid_sfont.h"
 #include "fluid_list.h"
@@ -141,6 +142,17 @@ typedef struct sfGenList {
   genAmountType genAmount; 
 } sfGenList;
 
+typedef uint16_t SFModulator;
+typedef uint16_t SFTransform;
+
+typedef struct sfModList
+{
+SFModulator sfModSrcOper;
+uint16_t sfModDestOper;
+int16_t modAmount;
+SFModulator sfModAmtSrcOper;
+SFTransform sfModTransOper;
+} sfModList;
 
 typedef struct sfInstGenList {
   SFGenerator sfGenOper;
@@ -185,10 +197,12 @@ typedef struct sfSample {
 #define inst_size 22
 #define ibag_size 4
 #define igen_size 4
+#define imod_size 10
 #define shdr_size 46
 #define phdr_size 38
 #define pbag_size 4
 #define pgen_size 4
+#define pmod_size 10
 
 #include <fluid_gen.h>
 
@@ -239,7 +253,9 @@ typedef struct sf2_inst_zone {
   int velhi;
 
   fluid_sample_t* sample;
-  fluid_list_t *gens;
+  fluid_list_t *gen;
+
+  fluid_mod_t *mod;
 
 } sf2_inst_zone;
 
@@ -252,6 +268,7 @@ typedef struct sf2_inst {
   sf2_inst_zone *global_inst_zone;
 
   uint8_t parsed;
+  uint32_t refcount;
 } sf2_inst;
 
 typedef struct sf2_preset_zone {
@@ -262,7 +279,9 @@ typedef struct sf2_preset_zone {
   int velhi;
 
   sf2_inst *inst;
-  fluid_list_t *gens;
+  fluid_list_t *gen;
+
+  fluid_mod_t *mod;
 
 } sf2_preset_zone;
 

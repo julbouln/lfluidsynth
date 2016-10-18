@@ -101,10 +101,12 @@ fluid_gen_t * fluid_gen_create(uint8_t num) {
     gen->mod = 0.0;
     gen->nrpn = 0.0;
     gen->val = fluid_gen_info[num].def;
+//    printf("create gen %d\n", num);
     return gen;
 }
 
 fluid_gen_t *fluid_gen_get(fluid_list_t *gen_list, uint8_t num) {
+//    printf("get gen %d\n",num);
     fluid_gen_t *gen;
     fluid_list_t *p = gen_list;
     while (p != NULL) {
@@ -116,6 +118,7 @@ fluid_gen_t *fluid_gen_get(fluid_list_t *gen_list, uint8_t num) {
     }
     return NULL;
 }
+
 
 fluid_real_t fluid_gen_get_default_value(uint8_t num) {
     return fluid_gen_info[num].def;

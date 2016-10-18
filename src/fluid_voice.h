@@ -49,7 +49,7 @@ struct _fluid_env_data_t {
 };
 
 /* Indices for envelope tables */
-enum fluid_voice_envelope_index_t{
+enum fluid_voice_envelope_index_t {
 	FLUID_VOICE_ENVDELAY,
 	FLUID_VOICE_ENVATTACK,
 	FLUID_VOICE_ENVHOLD,
@@ -72,7 +72,11 @@ struct _fluid_voice_t
 	uint8_t key;              /* the key, quick acces for noteoff */
 	uint8_t vel;              /* the velocity */
 	fluid_channel_t* channel;
+#ifdef FLUID_NEW_VOICE_GEN_API
+	fluid_list_t *gen;
+#else
 	fluid_gen_t gen[GEN_LAST];
+#endif
 #ifdef FLUID_NEW_VOICE_MOD_API
 	fluid_list_t *mod;
 #else
@@ -82,10 +86,6 @@ struct _fluid_voice_t
 	uint8_t has_looped;                 /* Flag that is set as soon as the first loop is completed. */
 	fluid_sample_t* sample;
 
-#ifdef FLUID_SAMPLE_CHUNKED
-	fluid_sample_chunk_t* sample_chunk;
-#endif
-	
 	uint8_t check_sample_sanity_flag;   /* Flag that initiates, that sample-related parameters
 					   have to be checked. */
 
@@ -206,12 +206,12 @@ int delete_fluid_voice(fluid_voice_t* voice);
 void fluid_voice_start(fluid_voice_t* voice);
 
 int fluid_voice_write(fluid_voice_t* voice,
-		      fluid_buf_t* left, fluid_buf_t* right,
-		      fluid_buf_t* reverb_buf, fluid_buf_t* chorus_buf);
+                      fluid_buf_t* left, fluid_buf_t* right,
+                      fluid_buf_t* reverb_buf, fluid_buf_t* chorus_buf);
 
 int fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
-		     fluid_channel_t* channel, int key, int vel,
-		     unsigned int id, unsigned int time, fluid_real_t gain);
+                     fluid_channel_t* channel, int key, int vel,
+                     unsigned int id, unsigned int time, fluid_real_t gain);
 
 int fluid_voice_modulate(fluid_voice_t* voice, int cc, int ctrl);
 int fluid_voice_modulate_all(fluid_voice_t* voice);
@@ -235,7 +235,7 @@ int fluid_voice_off(fluid_voice_t* voice);
 int fluid_voice_calculate_runtime_synthesis_parameters(fluid_voice_t* voice);
 fluid_channel_t* fluid_voice_get_channel(fluid_voice_t* voice);
 int calculate_hold_decay_buffers(fluid_voice_t* voice, int gen_base,
-				 int gen_key2base, int is_decay);
+                                 int gen_key2base, int is_decay);
 int fluid_voice_kill_excl(fluid_voice_t* voice);
 fluid_real_t fluid_voice_get_lower_boundary_for_attenuation(fluid_voice_t* voice);
 fluid_real_t fluid_voice_determine_amplitude_that_reaches_noise_floor_for_sample(fluid_voice_t* voice);
@@ -254,15 +254,24 @@ void fluid_voice_check_sample_sanity(fluid_voice_t* voice);
 #define _SUSTAINED(voice)  ((voice)->status == FLUID_VOICE_SUSTAINED)
 #define _AVAILABLE(voice)  (((voice)->status == FLUID_VOICE_CLEAN) || ((voice)->status == FLUID_VOICE_OFF))
 #define _RELEASED(voice)  ((voice)->chan == NO_CHANNEL)
+#ifdef FLUID_NEW_VOICE_GEN_API
+ #define _SAMPLEMODE(voice) \
+	((fluid_voice_gen_val_or_default(voice, GEN_SAMPLEMODE)))
+#else
 #define _SAMPLEMODE(voice) ((int)(voice)->gen[GEN_SAMPLEMODE].val)
-
+#endif
 
 fluid_real_t fluid_voice_gen_value(fluid_voice_t* voice, int num);
 
+#ifdef FLUID_NEW_VOICE_GEN_API
+#define _GEN(_voice, _n) \
+	(fluid_voice_gen_val_all_or_default(_voice,_n))
+#else
 #define _GEN(_voice, _n) \
   ((fluid_real_t)(_voice)->gen[_n].val \
    + (fluid_real_t)(_voice)->gen[_n].mod \
    + (fluid_real_t)(_voice)->gen[_n].nrpn)
+#endif
 
 #define FLUID_SAMPLESANITY_CHECK (1 << 0)
 #define FLUID_SAMPLESANITY_STARTUP (1 << 1)
@@ -277,60 +286,67 @@ int fluid_dsp_float_interpolate_4th_order (fluid_voice_t *voice);
 int fluid_dsp_float_interpolate_7th_order (fluid_voice_t *voice);
 #endif
 
-  /*
-   *  The interface to the synthesizer's voices
-   *  Examples on using them can be found in fluid_defsfont.c
-   */
+/*
+ *  The interface to the synthesizer's voices
+ *  Examples on using them can be found in fluid_defsfont.c
+ */
 
-  /* for fluid_voice_add_mod */
-enum fluid_voice_add_mod{
-  FLUID_VOICE_OVERWRITE,
-  FLUID_VOICE_ADD,
-  FLUID_VOICE_DEFAULT
+/* for fluid_voice_add_mod */
+enum fluid_voice_add_mod {
+	FLUID_VOICE_OVERWRITE,
+	FLUID_VOICE_ADD,
+	FLUID_VOICE_DEFAULT
 };
 
-  /* Add a modulator to a voice (SF2.1 only). */
+#ifdef FLUID_NEW_VOICE_GEN_API
+
+fluid_gen_t *fluid_voice_gen_get_or_add(fluid_voice_t *voice, uint8_t num);
+fluid_real_t fluid_voice_gen_val_or_default(fluid_voice_t *voice, uint8_t num);
+fluid_real_t fluid_voice_gen_val_all_or_default(fluid_voice_t *voice, uint8_t num);
+#endif
+
+/* Add a modulator to a voice (SF2.1 only). */
 void fluid_voice_add_mod(fluid_voice_t* voice, fluid_mod_t* mod, int mode);
 
-  /** Set the value of a generator */
+/** Set the value of a generator */
 void fluid_voice_gen_set(fluid_voice_t* voice, int gen, float val);
 
-  /** Get the value of a generator */
+/** Get the value of a generator */
 float fluid_voice_gen_get(fluid_voice_t* voice, int gen);
 
-  /** Modify the value of a generator by val */
+/** Modify the value of a generator by val */
 void fluid_voice_gen_incr(fluid_voice_t* voice, int gen, float val);
 
 
-  /** Return the unique ID of the noteon-event. A sound font loader
-   *  may store the voice processes it has created for * real-time
-   *  control during the operation of a voice (for example: parameter
-   *  changes in sound font editor). The synth uses a pool of
-   *  voices, which are 'recycled' and never deallocated.
-   *
-   * Before modifying an existing voice, check
-   * - that its state is still 'playing'
-   * - that the ID is still the same
-   * Otherwise the voice has finished playing.
-   */
+/** Return the unique ID of the noteon-event. A sound font loader
+ *  may store the voice processes it has created for * real-time
+ *  control during the operation of a voice (for example: parameter
+ *  changes in sound font editor). The synth uses a pool of
+ *  voices, which are 'recycled' and never deallocated.
+ *
+ * Before modifying an existing voice, check
+ * - that its state is still 'playing'
+ * - that the ID is still the same
+ * Otherwise the voice has finished playing.
+ */
 unsigned int fluid_voice_get_id(fluid_voice_t* voice);
 
 
 int fluid_voice_is_playing(fluid_voice_t* voice);
 
-  /** If the peak volume during the loop is known, then the voice can
-   * be released earlier during the release phase. Otherwise, the
-   * voice will operate (inaudibly), until the envelope is at the
-   * nominal turnoff point. In many cases the loop volume is many dB
-   * below the maximum volume.  For example, the loop volume for a
-   * typical acoustic piano is 20 dB below max.  Taking that into
-   * account in the turn-off algorithm we can save 20 dB / 100 dB =>
-   * 1/5 of the total release time.
-   * So it's a good idea to call fluid_voice_optimize_sample
-   * on each sample once.
-   */
-  
+/** If the peak volume during the loop is known, then the voice can
+ * be released earlier during the release phase. Otherwise, the
+ * voice will operate (inaudibly), until the envelope is at the
+ * nominal turnoff point. In many cases the loop volume is many dB
+ * below the maximum volume.  For example, the loop volume for a
+ * typical acoustic piano is 20 dB below max.  Taking that into
+ * account in the turn-off algorithm we can save 20 dB / 100 dB =>
+ * 1/5 of the total release time.
+ * So it's a good idea to call fluid_voice_optimize_sample
+ * on each sample once.
+ */
+
 int fluid_voice_optimize_sample(fluid_sample_t* s);
-       
-   
+
+
 #endif /* _FLUID_VOICE_H */

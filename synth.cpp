@@ -11,7 +11,8 @@
 #include "RtAudio.h"
 #include "RtMidi.h"
 
-#define AUDIO_FORMAT RTAUDIO_FLOAT32
+//#define AUDIO_FORMAT RTAUDIO_FLOAT32
+#define AUDIO_FORMAT RTAUDIO_SINT16
 
 #define FRAME_SIZE 128
 
@@ -66,16 +67,28 @@ int audioCallback( void *outputBuffer, void *inputBuffer, unsigned int nBufferFr
 {
   LightFluidSynth *synth = (LightFluidSynth *)userData;
 
-  #if AUDIO_FORMAT==RTAUDIO_FLOAT32
-  float *buf = (float *)outputBuffer;
-  synth->writeStereoFloat(buf, nBufferFrames);
-  #elif AUDIO_FORMAT==RTAUDIO_SINT16
-  short *buf = (short *)outputBuffer;
-  synth->writeStereoS16((short *)buf, nBufferFrames);
-  #elif AUDIO_FORMAT==RTAUDIO_SINT32
-  int *buf = (int *)outputBuffer;
-  synth->writeStereoS32((int *)buf, nBufferFrames);
-  #endif
+  switch (AUDIO_FORMAT) {
+  case RTAUDIO_FLOAT32:
+  {
+    float *buf = (float *)outputBuffer;
+    synth->writeStereoFloat(buf, nBufferFrames);
+
+  }
+  break;
+  case RTAUDIO_SINT16:
+  {
+    int16_t *buf = (int16_t *)outputBuffer;
+    synth->writeStereoS16((short *)buf, nBufferFrames);
+  }
+  break;
+  case RTAUDIO_SINT32:
+  {
+    int32_t *buf = (int32_t *)outputBuffer;
+    synth->writeStereoS32((int *)buf, nBufferFrames);
+
+  }
+  break;
+  }
 
   return 0;
 }
@@ -83,7 +96,7 @@ int audioCallback( void *outputBuffer, void *inputBuffer, unsigned int nBufferFr
 int main(int argc, char** argv)
 {
 
-  if(argc != 2) {
+  if (argc != 2) {
     printf("Usage: synth file.sf2\n");
     exit(0);
   }
