@@ -250,7 +250,9 @@ fluid_gen_t *fluid_voice_gen_get_or_add(fluid_voice_t *voice, uint8_t num) {
     fluid_gen_t *gen = fluid_gen_get(voice->gen, num);
     if (!gen){
         gen = fluid_gen_create(num);
+#ifndef FLUID_NO_NRPN_EXT
         gen->nrpn=fluid_channel_get_gen(voice->channel, num);
+#endif
 //        printf("%d %f\n",num,gen->nrpn);
         voice->gen=fluid_list_append(voice->gen, gen);
     }
@@ -268,10 +270,18 @@ fluid_real_t fluid_voice_gen_val_or_default(fluid_voice_t *voice, uint8_t num) {
 
 fluid_real_t fluid_voice_gen_val_all_or_default(fluid_voice_t *voice, uint8_t num) {
     fluid_gen_t *gen = fluid_gen_get(voice->gen, num);
+
+#ifndef FLUID_NO_NRPN_EXT
     if(gen)
       return (gen->val+gen->mod+gen->nrpn);
     else
       return fluid_gen_info[num].def;
+#else
+    if(gen)
+      return (gen->val+gen->mod);
+    else
+      return fluid_gen_info[num].def;
+#endif
 }
 
 void fluid_voice_gen_set(fluid_voice_t* voice, int i, float val)
@@ -301,12 +311,16 @@ fluid_real_t fluid_voice_gen_value(fluid_voice_t* voice, int num)
    * function. */
 
   fluid_gen_t *gen = fluid_voice_gen_get_or_add(voice, num);
+#ifndef FLUID_NO_NRPN_EXT
   if (gen->flags == GEN_ABS_NRPN) {
     return gen->nrpn;
 
   } else {
     return (fluid_real_t) (gen->val + gen->mod + gen->nrpn);
   }
+#else
+    return (fluid_real_t) (gen->val + gen->mod);
+#endif
 }
 
 #else
@@ -332,11 +346,15 @@ fluid_real_t fluid_voice_gen_value(fluid_voice_t* voice, int num)
   /* This is an extension to the SoundFont standard. More
    * documentation is available at the fluid_synth_set_gen2()
    * function. */
+#ifndef FLUID_NO_NRPN_EXT
   if (voice->gen[num].flags == GEN_ABS_NRPN) {
     return (fluid_real_t) voice->gen[num].nrpn;
   } else {
     return (fluid_real_t) (voice->gen[num].val + voice->gen[num].mod + voice->gen[num].nrpn);
   }
+#else
+    return (fluid_real_t) (voice->gen[num].val + voice->gen[num].mod);
+#endif
 }
 #endif
 
@@ -545,7 +563,7 @@ int fluid_voice_calc_amp(fluid_voice_t *voice) {
   return 0;
 }
 
-int fluid_voice_calc_resonant_filter(fluid_voice_t *voice) {
+int fluid_voice_iir_filter_calc(fluid_voice_t *voice) {
   fluid_real_t fres;
 
   /*************** resonant filter ******************/
@@ -614,15 +632,16 @@ int fluid_voice_calc_resonant_filter(fluid_voice_t *voice) {
 //    printf("%f %f\n",a1_temp,a2_temp)
     fluid_real_t b02_temp = b1_temp * 0.5f;
 
+//    printf("%f %f %f %f\n",a1_temp,a2_temp,b02_temp,b1_temp);
     if (voice->filter_startup)
     {
       /* The filter is calculated, because the voice was started up.
        * In this case set the filter coefficients without delay.
        */
-      voice->a1 = a1_temp;
-      voice->a2 = a2_temp;
-      voice->b02 = b02_temp;
-      voice->b1 = b1_temp;
+      voice->a1 = FLUID_REAL_TO_FRAC(a1_temp);
+      voice->a2 = FLUID_REAL_TO_FRAC(a2_temp);
+      voice->b02 = FLUID_REAL_TO_FRAC(b02_temp);
+      voice->b1 = FLUID_REAL_TO_FRAC(b1_temp);
       voice->filter_coeff_incr_count = 0;
       voice->filter_startup = 0;
 //       printf("Setting initial filter coefficients.\n");
@@ -641,10 +660,11 @@ int fluid_voice_calc_resonant_filter(fluid_voice_t *voice) {
 
 #define FILTER_TRANSITION_SAMPLES (FLUID_BUFSIZE)
 
-      voice->a1_incr = (a1_temp - voice->a1) / FILTER_TRANSITION_SAMPLES;
-      voice->a2_incr = (a2_temp - voice->a2) / FILTER_TRANSITION_SAMPLES;
-      voice->b02_incr = (b02_temp - voice->b02) / FILTER_TRANSITION_SAMPLES;
-      voice->b1_incr = (b1_temp - voice->b1) / FILTER_TRANSITION_SAMPLES;
+      voice->a1_incr = (FLUID_REAL_TO_FRAC(a1_temp) - voice->a1) / FILTER_TRANSITION_SAMPLES;
+      voice->a2_incr = (FLUID_REAL_TO_FRAC(a2_temp) - voice->a2) / FILTER_TRANSITION_SAMPLES;
+      voice->b02_incr = (FLUID_REAL_TO_FRAC(b02_temp) - voice->b02) / FILTER_TRANSITION_SAMPLES;
+      voice->b1_incr = (FLUID_REAL_TO_FRAC(b1_temp) - voice->b1) / FILTER_TRANSITION_SAMPLES;
+
       /* Have to add the increments filter_coeff_incr_count times. */
       voice->filter_coeff_incr_count = FILTER_TRANSITION_SAMPLES;
     }
@@ -654,22 +674,22 @@ int fluid_voice_calc_resonant_filter(fluid_voice_t *voice) {
 
 
 
-void fluid_voice_filters(fluid_voice_t *voice, int count) {
+void fluid_voice_iir_filter_apply(fluid_voice_t *voice, int count) {
   /* IIR filter sample history */
-  fluid_real_t dsp_hist1 = voice->hist1;
-  fluid_real_t dsp_hist2 = voice->hist2;
+  fluid_buf_t dsp_hist1 = voice->hist1;
+  fluid_buf_t dsp_hist2 = voice->hist2;
 
   /* IIR filter coefficients */
-  fluid_real_t dsp_a1 = voice->a1;
-  fluid_real_t dsp_a2 = voice->a2;
-  fluid_real_t dsp_b02 = voice->b02;
-  fluid_real_t dsp_b1 = voice->b1;
-  fluid_real_t dsp_a1_incr = voice->a1_incr;
-  fluid_real_t dsp_a2_incr = voice->a2_incr;
-  fluid_real_t dsp_b02_incr = voice->b02_incr;
-  fluid_real_t dsp_b1_incr = voice->b1_incr;
+  fluid_buf_t dsp_a1 = voice->a1;
+  fluid_buf_t dsp_a2 = voice->a2;
+  fluid_buf_t dsp_b02 = voice->b02;
+  fluid_buf_t dsp_b1 = voice->b1;
+  fluid_buf_t dsp_a1_incr = voice->a1_incr;
+  fluid_buf_t dsp_a2_incr = voice->a2_incr;
+  fluid_buf_t dsp_b02_incr = voice->b02_incr;
+  fluid_buf_t dsp_b1_incr = voice->b1_incr;
   int dsp_filter_coeff_incr_count = voice->filter_coeff_incr_count;
-  fluid_real_t dsp_centernode;
+  fluid_buf_t dsp_centernode;
 
   fluid_buf_t *dsp_buf = voice->dsp_buf;
   int dsp_i;
@@ -677,21 +697,26 @@ void fluid_voice_filters(fluid_voice_t *voice, int count) {
   /* filter (implement the voice filter according to SoundFont standard) */
 
   /* Check for denormal number (too close to zero). */
-  if (FLUID_ABS(dsp_hist1) < 1e-20) dsp_hist1 = 0.0f;  /* FIXME JMG - Is this even needed? */
+//  if (FLUID_ABS(dsp_hist1) < 1e-20) dsp_hist1 = 0.0f;  /* FIXME JMG - Is this even needed? */
+
+  if (FLUID_ABS(FLUID_FRAC_TO_REAL(dsp_hist1)) < 1e-20) dsp_hist1 = 0;  /* FIXME JMG - Is this even needed? */
 
   /* Two versions of the filter loop. One, while the filter is
   * changing towards its new setting. The other, if the filter
   * doesn't change.
   */
+  #if 0
 
   if (dsp_filter_coeff_incr_count > 0)
   {
+#endif
     /* Increment is added to each filter coefficient filter_coeff_incr_count times. */
     for (dsp_i = 0; dsp_i < count; dsp_i++)
     {
       /* The filter is implemented in Direct-II form. */
-      dsp_centernode = dsp_buf[dsp_i] - dsp_a1 * dsp_hist1 - dsp_a2 * dsp_hist2;
-      dsp_buf[dsp_i] = dsp_b02 * (dsp_centernode + dsp_hist2) + dsp_b1 * dsp_hist1;
+      dsp_centernode = dsp_buf[dsp_i] - FLUID_BUF_MULT32(dsp_hist1,dsp_a1) - FLUID_BUF_MULT32(dsp_hist2,dsp_a2);
+      dsp_buf[dsp_i] = FLUID_BUF_MULT32((dsp_centernode + dsp_hist2),dsp_b02) + FLUID_BUF_MULT32(dsp_hist1,dsp_b1);
+//      printf("%d %d %d %d %d %d\n",dsp_b02,dsp_b1,dsp_centernode,dsp_hist2,dsp_hist1,dsp_buf[dsp_i]);
       dsp_hist2 = dsp_hist1;
       dsp_hist1 = dsp_centernode;
 
@@ -703,18 +728,20 @@ void fluid_voice_filters(fluid_voice_t *voice, int count) {
         dsp_b1 += dsp_b1_incr;
       }
     } /* for dsp_i */
+  #if 0
   }
   else /* The filter parameters are constant.  This is duplicated to save time. */
   {
     for (dsp_i = 0; dsp_i < count; dsp_i++)
     { /* The filter is implemented in Direct-II form. */
-      dsp_centernode = dsp_buf[dsp_i] - dsp_a1 * dsp_hist1 - dsp_a2 * dsp_hist2;
-      dsp_buf[dsp_i] = dsp_b02 * (dsp_centernode + dsp_hist2) + dsp_b1 * dsp_hist1;
+      dsp_centernode = (dsp_buf[dsp_i] - FLUID_BUF_SAT(FLUID_BUF_MULT32(dsp_hist1,dsp_a1)) - FLUID_BUF_SAT(FLUID_BUF_MULT32(dsp_hist2,dsp_a2))) ;
+      dsp_buf[dsp_i] = (FLUID_BUF_MULT32((dsp_centernode + dsp_hist2),dsp_b02) + FLUID_BUF_MULT32(dsp_hist1,dsp_b1));
+//      printf("%f %d %d\n",FLUID_FRAC_TO_REAL(dsp_buf[dsp_i]),FLUID_BUF_S16(dsp_buf[dsp_i]),FLUID_BUF_SAT(FLUID_BUF_S16(dsp_buf[dsp_i])));
       dsp_hist2 = dsp_hist1;
       dsp_hist1 = dsp_centernode;
     }
   }
-
+#endif
   voice->hist1 = dsp_hist1;
   voice->hist2 = dsp_hist2;
   voice->a1 = dsp_a1;
@@ -891,6 +918,7 @@ uint32_t fluid_voice_calc_stereo(fluid_voice_t *voice,
     *(dsp_right_buf) = FLUID_BUF_MAC(amp_right, in3, *(dsp_right_buf));
     *(dsp_right_buf)++;
 
+
     dsp_cnt--;
 //    __asm("BKPT 6");
   } // 64 * 3 = 192 loop penalty (0.96us@200mhz)
@@ -1048,7 +1076,8 @@ fluid_voice_write(fluid_voice_t* voice,
     return FLUID_OK;
   }
 
-//  fluid_voice_calc_resonant_filter(voice);
+  fluid_voice_iir_filter_calc(voice);
+
 
   /*********************** run the dsp chain ************************sampledata
    * The sample is mixed with the output buffer.
@@ -1079,6 +1108,8 @@ fluid_voice_write(fluid_voice_t* voice,
   }
 
   count = fluid_voice_calc(voice);
+
+  fluid_voice_iir_filter_apply(voice, count);
 
   fluid_voice_calc_stereo(voice, dsp_left_buf, dsp_right_buf, count);
 
@@ -1382,7 +1413,7 @@ int calculate_hold_decay_buffers(fluid_voice_t* voice, int gen_base,
  * of all three.
  */
 void
-fluid_voice_update_param(fluid_voice_t* voice, int gen)
+fluid_voice_update_param(fluid_voice_t* voice, uint8_t gen)
 {
   fluid_real_t q_dB;
   fluid_real_t x;
@@ -1411,12 +1442,24 @@ fluid_voice_update_param(fluid_voice_t* voice, int gen)
   {
 #ifdef FLUID_NEW_VOICE_GEN_API
   // TODO optimize
+#ifndef FLUID_NO_NRPN_EXT
   fluid_gen_t *gen_att=fluid_voice_gen_get_or_add(voice,GEN_ATTENUATION);
     voice->attenuation = ((fluid_real_t)gen_att->val * ALT_ATTENUATION_SCALE) +
                          (fluid_real_t)gen_att->mod + (fluid_real_t)gen_att->nrpn;
 #else
+  fluid_gen_t *gen_att=fluid_voice_gen_get_or_add(voice,GEN_ATTENUATION);
+    voice->attenuation = ((fluid_real_t)gen_att->val * ALT_ATTENUATION_SCALE) +
+                         (fluid_real_t)gen_att->mod;
+
+#endif
+#else
+#ifndef FLUID_NO_NRPN_EXT
     voice->attenuation = ((fluid_real_t)(voice)->gen[GEN_ATTENUATION].val * ALT_ATTENUATION_SCALE) +
                          (fluid_real_t)(voice)->gen[GEN_ATTENUATION].mod + (fluid_real_t)(voice)->gen[GEN_ATTENUATION].nrpn;
+#else
+    voice->attenuation = ((fluid_real_t)(voice)->gen[GEN_ATTENUATION].val * ALT_ATTENUATION_SCALE) +
+                         (fluid_real_t)(voice)->gen[GEN_ATTENUATION].mod;
+#endif                         
 #endif
     /* Range: SF2.01 section 8.1.3 # 48
      * Motivation for range checking:
@@ -1543,6 +1586,8 @@ fluid_voice_update_param(fluid_voice_t* voice, int gen)
      *  only on Q, so this is the right place to calculate it.
      */
     voice->filter_gain = (fluid_real_t) (1.0 / FLUID_SQRT(voice->q_lin));
+
+//  printf("GEN_FILTERQ %f %f %f\n",_GEN(voice, GEN_FILTERQ), voice->q_lin, voice->filter_gain);
 
     /* The synthesis loop will have to recalculate the filter coefficients. */
     voice->last_fres = -1.;
@@ -2474,8 +2519,9 @@ void fluid_voice_check_sample_sanity(fluid_voice_t* voice)
 #endif
 }
 
+#ifndef FLUID_NO_NRPN_EXT
 
-int fluid_voice_set_param(fluid_voice_t* voice, int gen, fluid_real_t nrpn_value, int abs)
+int fluid_voice_set_param(fluid_voice_t* voice, uint8_t gen, fluid_real_t nrpn_value, int abs)
 {
 #ifdef FLUID_NEW_VOICE_GEN_API
   fluid_gen_t *gen_m=fluid_voice_gen_get_or_add(voice,gen);
@@ -2488,6 +2534,7 @@ int fluid_voice_set_param(fluid_voice_t* voice, int gen, fluid_real_t nrpn_value
   fluid_voice_update_param(voice, gen);
   return FLUID_OK;
 }
+#endif
 
 int fluid_voice_set_gain(fluid_voice_t* voice, fluid_real_t gain)
 {

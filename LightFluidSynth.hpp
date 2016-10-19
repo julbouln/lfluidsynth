@@ -4,7 +4,7 @@
 #include "lfluidsynth.h"
 
 //#define POLYPHONY 24 // standard GM
-#define POLYPHONY 32
+#define POLYPHONY 64
 //#define POLYPHONY 64
 //#define SAMPLE_RATE 48000
 #define SAMPLE_RATE 44100
@@ -25,8 +25,8 @@ public:
 
 //  fluid_settings_setstr(settings, "audio.period-size", "1024");
 
-//    fluid_settings_setstr(settings, "synth.reverb.active", "yes");
-//    fluid_settings_setstr(settings, "synth.chorus.active", "yes");
+    fluid_settings_setstr(settings, "synth.reverb.active", "no");
+    fluid_settings_setstr(settings, "synth.chorus.active", "no");
     fluid_settings_setint(settings, "synth.polyphony", POLYPHONY);
 
 //    fluid_settings_setstr(settings, "synth.verbose", "yes");
@@ -81,12 +81,12 @@ public:
 
   }
 
-  void writeStereoS16(short *buf, int n) {
-    fluid_synth_write_s16(synth, n, (short *)buf, 0, 2, (short *)buf, 1, 2);
+  void writeStereoS16(int16_t *buf, int n) {
+    fluid_synth_write_s16(synth, n, (int16_t *)buf, 0, 2, (int16_t *)buf, 1, 2);
 
   }
-  void writeStereoS32(int *buf, int n) {
-    fluid_synth_write_s32(synth, n, (int *)buf, 0, 2, (int *)buf, 1, 2);
+  void writeStereoS32(int32_t *buf, int n) {
+    fluid_synth_write_s32(synth, n, (int32_t *)buf, 0, 2, (int32_t *)buf, 1, 2);
   }
 
 

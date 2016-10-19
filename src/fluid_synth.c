@@ -1644,11 +1644,11 @@ fluid_synth_write_s16(fluid_synth_t* synth, int len,
     if(right_sample > 1.0f) right_sample = 1.0f;
     if(right_sample < -1.0f) right_sample = -1.0f;
 */
-    left_sample =  (int16_t) FLUID_BUF_S16(left_sample);
-    right_sample =  (int16_t) FLUID_BUF_S16(right_sample);
+    left_sample =  (int16_t) FLUID_BUF_SAT(FLUID_BUF_S16(left_sample));
+    right_sample =  (int16_t) FLUID_BUF_SAT(FLUID_BUF_S16(right_sample));
 
-    left_out[j] = FLUID_BUF_SAT(left_sample);
-    right_out[k] = FLUID_BUF_SAT(right_sample);
+    left_out[j] = (left_sample);
+    right_out[k] = (right_sample);
   }
 
   synth->cur = l;
@@ -2720,6 +2720,8 @@ int fluid_synth_getint(fluid_synth_t* synth, char* name, int* val)
   return fluid_settings_getint(synth->settings, name, val);
 }
 
+#ifndef FLUID_NO_NRPN_EXT
+
 int
 fluid_synth_set_gen(fluid_synth_t* synth, int chan, int param, fluid_real_t value)
 {
@@ -2802,6 +2804,7 @@ fluid_synth_set_gen2(fluid_synth_t* synth, int chan, int param,
 
   return FLUID_OK;
 }
+#endif
 
 float fluid_synth_get_gen(fluid_synth_t* synth, int chan, int param)
 {

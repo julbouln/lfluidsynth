@@ -99,7 +99,9 @@ fluid_gen_t * fluid_gen_create(uint8_t num) {
     gen->num = num;
     gen->flags = GEN_UNUSED;
     gen->mod = 0.0;
+#ifndef FLUID_NO_NRPN_EXT
     gen->nrpn = 0.0;
+#endif
     gen->val = fluid_gen_info[num].def;
 //    printf("create gen %d\n", num);
     return gen;
@@ -144,7 +146,9 @@ fluid_gen_set_default_values(fluid_gen_t* gen)
     for (i = 0; i < GEN_LAST; i++) {
         gen[i].flags = GEN_UNUSED;
         gen[i].mod = 0.0;
+#ifndef FLUID_NO_NRPN_EXT
         gen[i].nrpn = 0.0;
+#endif
         gen[i].val = fluid_gen_info[i].def;
     }
 
@@ -162,6 +166,7 @@ fluid_gen_init(fluid_gen_t* gen, fluid_channel_t* channel)
 
     fluid_gen_set_default_values(gen);
 
+#ifndef FLUID_NO_NRPN_EXT
     for (i = 0; i < GEN_LAST; i++) {
         gen[i].nrpn = fluid_channel_get_gen(channel, i);
 
@@ -172,6 +177,7 @@ fluid_gen_init(fluid_gen_t* gen, fluid_channel_t* channel)
             gen[i].flags = GEN_ABS_NRPN;
         }
     }
+#endif
 
     return FLUID_OK;
 }
@@ -182,9 +188,11 @@ fluid_real_t fluid_gen_scale(int gen, fluid_real_t value)
             + value * (fluid_gen_info[gen].max - fluid_gen_info[gen].min));
 }
 
+#ifndef FLUID_NO_NRPN_EXT
 fluid_real_t fluid_gen_scale_nrpn(int gen, int data)
 {
     fluid_real_t value = (float) data - 8192.0f;
     fluid_clip(value, -8192, 8192);
     return value * (float) fluid_gen_info[gen].nrpn_scale;
 }
+#endif

@@ -10,7 +10,7 @@
     RtAudio WWW site: http://www.music.mcgill.ca/~gary/rtaudio/
 
     RtAudio: realtime audio i/o C++ classes
-    Copyright (c) 2001-2014 Gary P. Scavone
+    Copyright (c) 2001-2016 Gary P. Scavone
 
     Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation files
@@ -38,7 +38,7 @@
 */
 /************************************************************************/
 
-// RtAudio: Version 4.1.1
+// RtAudio: Version 4.1.2
 
 #include "RtAudio.h"
 #include <iostream>
@@ -669,7 +669,7 @@ RtAudio::DeviceInfo RtApiCore :: getDeviceInfo( unsigned int device )
   free(name);
 
   // Get the output stream "configuration".
-  AudioBufferList	*bufferList = nil;
+  AudioBufferList *bufferList = nil;
   property.mSelector = kAudioDevicePropertyStreamConfiguration;
   property.mScope = kAudioDevicePropertyScopeOutput;
   //  property.mElement = kAudioObjectPropertyElementWildcard;
@@ -920,7 +920,7 @@ bool RtApiCore :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
     property.mScope = kAudioDevicePropertyScopeOutput;
 
   // Get the stream "configuration".
-  AudioBufferList	*bufferList = nil;
+  AudioBufferList *bufferList = nil;
   dataSize = 0;
   property.mSelector = kAudioDevicePropertyStreamConfiguration;
   result = AudioObjectGetPropertyDataSize( id, &property, 0, NULL, &dataSize );
@@ -1012,7 +1012,7 @@ bool RtApiCore :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
   free( bufferList );
 
   // Determine the buffer size.
-  AudioValueRange	bufferRange;
+  AudioValueRange bufferRange;
   dataSize = sizeof( AudioValueRange );
   property.mSelector = kAudioDevicePropertyBufferFrameSizeRange;
   result = AudioObjectGetPropertyData( id, &property, 0, NULL, &dataSize, &bufferRange );
@@ -1128,7 +1128,7 @@ bool RtApiCore :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
 
   // Now set the stream format for all streams.  Also, check the
   // physical format of the device and change that if necessary.
-  AudioStreamBasicDescription	description;
+  AudioStreamBasicDescription description;
   dataSize = sizeof( AudioStreamBasicDescription );
   property.mSelector = kAudioStreamPropertyVirtualFormat;
   result = AudioObjectGetPropertyData( id, &property, 0, NULL, &dataSize, &description );
@@ -1179,7 +1179,7 @@ bool RtApiCore :: probeDeviceOpen( unsigned int device, StreamMode mode, unsigne
   if ( description.mFormatID != kAudioFormatLinearPCM || description.mBitsPerChannel < 16 ) {
     description.mFormatID = kAudioFormatLinearPCM;
     //description.mSampleRate = (Float64) sampleRate;
-    AudioStreamBasicDescription	testDescription = description;
+    AudioStreamBasicDescription testDescription = description;
     UInt32 formatFlags;
 
     // We'll try higher bit rates first and then work our way down.
@@ -5158,10 +5158,10 @@ void RtApiWasapi::wasapiThread()
     // if the callback buffer was pushed renderBuffer reset callbackPulled flag
     if ( callbackPushed ) {
       callbackPulled = false;
+      // tick stream time
+      RtApi::tickStreamTime();
     }
 
-    // tick stream time
-    RtApi::tickStreamTime();
   }
 
 Exit:
@@ -6438,6 +6438,7 @@ void RtApiDs :: callbackEvent()
       if ( FAILED( result ) ) {
         errorStream_ << "RtApiDs::callbackEvent: error (" << getErrorString( result ) << ") getting current write position!";
         errorText_ = errorStream_.str();
+        MUTEX_UNLOCK( &stream_.mutex );
         error( RtAudioError::SYSTEM_ERROR );
         return;
       }
@@ -8070,8 +8071,8 @@ static void *alsaCallbackHandler( void *ptr )
   bool *isRunning = &info->isRunning;
 
 #ifdef SCHED_RR // Undefined with some OSes (eg: NetBSD 1.6.x with GNU Pthread)
-  if ( &info->doRealtime ) {
-    pthread_t tID = pthread_self();	 // ID of this thread
+  if ( info->doRealtime ) {
+    pthread_t tID = pthread_self();  // ID of this thread
     sched_param prio = { info->priority }; // scheduling priority of thread
     pthread_setschedparam( tID, SCHED_RR, &prio );
   }
@@ -10142,8 +10143,8 @@ void RtApi :: convertBuffer( char *outBuffer, char *inBuffer, ConvertInfo &info 
 
 void RtApi :: byteSwapBuffer( char *buffer, unsigned int samples, RtAudioFormat format )
 {
-  register char val;
-  register char *ptr;
+  char val;
+  char *ptr;
 
   ptr = buffer;
   if ( format == RTAUDIO_SINT16 ) {

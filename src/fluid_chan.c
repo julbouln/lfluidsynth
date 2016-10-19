@@ -249,6 +249,8 @@ fluid_channel_cc(fluid_channel_t* chan, int num, int value)
 
       if (chan->nrpn_active)  /* NRPN is active? */
       {
+#ifndef FLUID_NO_NRPN_EXT
+
 	/* SontFont 2.01 NRPN Message (Sect. 9.6, p. 74)  */
 	if ((chan->cc[NRPN_MSB] == 120) && (chan->cc[NRPN_LSB] < 100))
 	{
@@ -260,6 +262,7 @@ fluid_channel_cc(fluid_channel_t* chan, int num, int value)
 
 	  chan->nrpn_select = 0;  /* Reset to 0 */
 	}
+  #endif
       }
       else if (chan->cc[RPN_MSB] == 0)    /* RPN is active: MSB = 0? */
       {
@@ -270,12 +273,16 @@ fluid_channel_cc(fluid_channel_t* chan, int num, int value)
 	    /* FIXME - Handle LSB? (Fine bend range in cents) */
 	    break;
 	  case RPN_CHANNEL_FINE_TUNE:   /* Fine tune is 14 bit over 1 semitone (+/- 50 cents, 8192 = center) */
+#ifndef FLUID_NO_NRPN_EXT
 	    fluid_synth_set_gen(chan->synth, chan->channum, GEN_FINETUNE,
 				(data - 8192) / 8192.0 * 50.0);
+#endif
 	    break;
 	  case RPN_CHANNEL_COARSE_TUNE: /* Coarse tune is 7 bit and in semitones (64 is center) */
+#ifndef FLUID_NO_NRPN_EXT
 	    fluid_synth_set_gen(chan->synth, chan->channum, GEN_COARSETUNE,
 				value - 64);
+#endif
 	    break;
 	  case RPN_TUNING_PROGRAM_CHANGE:
 	    break;

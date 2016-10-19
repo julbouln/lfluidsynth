@@ -578,7 +578,7 @@ enum fluid_interp {
 
 
 
-
+#ifndef FLUID_NO_NRPN_EXT
   /*
    * 
    * Generator interface 
@@ -612,7 +612,7 @@ int fluid_synth_set_gen(fluid_synth_t* synth, int chan, int param, float value);
       \returns The value of the generator.  
   */
 float fluid_synth_get_gen(fluid_synth_t* synth, int chan, int param);
-
+#endif
 
 
 

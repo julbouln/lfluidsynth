@@ -131,9 +131,10 @@ int main(int argc, char** argv)
       std::cout << ": maximum output channels = " << info.outputChannels << "\n";
     }
   }
-  rtParams.deviceId = 3;//dac.getDefaultOutputDevice();
+//  rtParams.deviceId = 3;
+  rtParams.deviceId = dac.getDefaultOutputDevice();
   rtParams.nChannels = 2;
-  unsigned int bufferFrames = FRAME_SIZE; // 512 sample frames
+  unsigned int bufferFrames = FRAME_SIZE;
 
   RtAudio::StreamOptions options;
   options.flags = RTAUDIO_SCHEDULE_REALTIME;

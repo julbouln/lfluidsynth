@@ -164,22 +164,22 @@ struct _fluid_voice_t
 	/* indicates, that the filter has to be recalculated. */
 	fluid_real_t q_lin;             /* the q-factor on a linear scale */
 	fluid_real_t filter_gain;       /* Gain correction factor, depends on q */
-	fluid_real_t hist1, hist2;      /* Sample history for the IIR filter */
+	fluid_buf_t hist1, hist2;      /* Sample history for the IIR filter */
 	uint8_t filter_startup;             /* Flag: If set, the filter will be set directly.
 					   Else it changes smoothly. */
 
 	/* filter coefficients */
 	/* The coefficients are normalized to a0. */
 	/* b0 and b2 are identical => b02 */
-	fluid_real_t b02;              /* b0 / a0 */
-	fluid_real_t b1;              /* b1 / a0 */
-	fluid_real_t a1;              /* a0 / a0 */
-	fluid_real_t a2;              /* a1 / a0 */
+	fluid_buf_t b02;              /* b0 / a0 */
+	fluid_buf_t b1;              /* b1 / a0 */
+	fluid_buf_t a1;              /* a0 / a0 */
+	fluid_buf_t a2;              /* a1 / a0 */
 
-	fluid_real_t b02_incr;
-	fluid_real_t b1_incr;
-	fluid_real_t a1_incr;
-	fluid_real_t a2_incr;
+	fluid_buf16_t b02_incr;
+	fluid_buf16_t b1_incr;
+	fluid_buf16_t a1_incr;
+	fluid_buf16_t a2_incr;
 	int filter_coeff_incr_count;
 
 	/* pan */
@@ -217,7 +217,7 @@ int fluid_voice_modulate(fluid_voice_t* voice, int cc, int ctrl);
 int fluid_voice_modulate_all(fluid_voice_t* voice);
 
 /** Set the NRPN value of a generator. */
-int fluid_voice_set_param(fluid_voice_t* voice, int gen, fluid_real_t value, int abs);
+int fluid_voice_set_param(fluid_voice_t* voice, uint8_t gen, fluid_real_t value, int abs);
 
 
 /** Set the gain. */
@@ -228,7 +228,7 @@ int fluid_voice_set_gain(fluid_voice_t* voice, fluid_real_t gain);
     'gen'. This is only necessary after changing a generator of an
     already operating voice.  Most applications will not need this
     function.*/
-void fluid_voice_update_param(fluid_voice_t* voice, int gen);
+void fluid_voice_update_param(fluid_voice_t* voice, uint8_t gen);
 
 int fluid_voice_noteoff(fluid_voice_t* voice);
 int fluid_voice_off(fluid_voice_t* voice);

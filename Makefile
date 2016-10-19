@@ -8,18 +8,28 @@ CFLAGS += -DFLUID_SAMPLE_MMAP # TODO linux
 #CFLAGS += -DFLUID_SAMPLE_READ_CHUNK
 CFLAGS += -DFLUID_NEW_VOICE_MOD_API
 CFLAGS += -DFLUID_NEW_VOICE_GEN_API
+CFLAGS += -DFLUID_NO_NRPN_EXT
 CFLAGS += -DFLUID_BUFFER_S16
 #CFLAGS += -DFLUID_ARM_OPT 
 #CFLAGS+=-march=native
 #CFLAGS+=-ftree-vectorize -ffast-math -fsingle-precision-constant
-SYNTH_CFLAGS=-Irt -D__LINUX_ALSA__ 
+#SYNTH_CFLAGS=-Irt -D__LINUX_PULSE__ -D__LINUX_ALSA__ 
+
 
 # for massif and callgrind
-SF2_PROF_FILE=merlin.sf2
+SF2_PROF_FILE=ct4mgm.sf2
 
-all: $(FLUIDSYNTH_OBJS)
-	g++ $(CFLAGS) $(SYNTH_CFLAGS) rt/RtMidi.cpp rt/RtAudio.cpp synth.cpp -o synth $^ -lc -lm -lpthread -lasound
+all: $(FLUIDSYNTH_OBJS) rt/RtAudio.o rt/RtMidi.o
+	g++ $(CFLAGS) $(SYNTH_CFLAGS) synth.cpp -o synth $^ -lc -lm -lpthread -lasound -lpulse -lpulse-simple
 	objdump -St synth >synth.lst
+
+
+rt/RtAudio.o:
+	g++ -Irt -D__LINUX_PULSE__ -c -o rt/RtAudio.o rt/RtAudio.cpp
+
+rt/RtMidi.o:
+	g++ -Irt -D__LINUX_ALSA__ -c -o rt/RtMidi.o rt/RtMidi.cpp
+
 
 timgm6mb.sf2:
 	wget https://launchpad.net/ubuntu/+archive/primary/+files/timgm6mb-soundfont_1.3.orig.tar.gz
@@ -38,7 +48,7 @@ callgrind: synth
 	pasuspender -- valgrind --dsymutil=yes --tool=callgrind --dump-instr=yes --collect-jumps=yes ./synth $(SF2_PROF_FILE)
 
 massif: synth
-	pasuspender -- valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./synth $(SF2_PROF_FILE)
+	valgrind --tool=massif  --heap-admin=1 --depth=50 --peak-inaccuracy=0.0 --detailed-freq=1 --threshold=0.0 --time-unit=B --massif-out-file=massif.out ./synth $(SF2_PROF_FILE)
 	ms_print massif.out > massif.log
 
 test_massif: test
@@ -51,6 +61,7 @@ test_altsfont_massif: test_altsfont
 
 clean:
 	rm -f src/*.o
+	rm -f rt/*.o
 	rm -f massif.*
 #	rm -f callgrind.*
 	rm -f synth
