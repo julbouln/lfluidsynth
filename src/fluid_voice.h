@@ -166,12 +166,12 @@ struct _fluid_voice_t
 
 	fluid_real_t q_lin;             /* the q-factor on a linear scale */
 	fluid_real_t filter_gain;       /* Gain correction factor, depends on q */
+	uint8_t filter_startup;             /* Flag: If set, the filter will be set directly.
+					   Else it changes smoothly. */
 
 #ifdef FLUID_SIMPLE_IIR
 	float vibrapos;
 	float vibraspeed;
-	uint8_t filter_startup;             /* Flag: If set, the filter will be set directly.
-					   Else it changes smoothly. */
 #else
 	fluid_buf_t hist1, hist2;      /* Sample history for the IIR filter */
 

@@ -1079,10 +1079,13 @@ fluid_voice_interpolate(fluid_voice_t *voice)
 
 #ifdef FLUID_AVX_OPT
   float inf0, inf1, inf2, inf3, inf4, inf5, inf6, inf7;
-  float amp0, amp1, amp2, amp3, amp4, amp5, amp6, amp7;
 
-  __m256 amp;
+  __m256 amp=_mm256_set1_ps(dsp_amp);
   __m256 in;
+  float dsp_amp_incr_u=dsp_amp_incr*8;
+  __m256 incr = _mm256_set_ps(1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0);
+  __m256 amp_incr = _mm256_set1_ps(dsp_amp_incr);
+  __m256 tmp_amp = _mm256_mul_ps(amp_incr, incr);
 
   dsp_cnt = FLUID_BUFSIZE >> 2;
   dsp_phase_index = dsp_phase >> 32;
@@ -1117,21 +1120,11 @@ fluid_voice_interpolate(fluid_voice_t *voice)
     dsp_phase += dsp_phase_incr;
     dsp_phase_index = dsp_phase >> 32;
 
-    amp0 = dsp_amp + dsp_amp_incr;
-    amp1 = amp0 + dsp_amp_incr;
-    amp2 = amp1 + dsp_amp_incr;
-    amp3 = amp2 + dsp_amp_incr;
-    amp4 = amp3 + dsp_amp_incr;
-    amp5 = amp4 + dsp_amp_incr;
-    amp6 = amp5 + dsp_amp_incr;
-    amp7 = amp6 + dsp_amp_incr;
-    dsp_amp = amp7;
+    amp = _mm256_add_ps(amp, tmp_amp);
+    dsp_amp+=dsp_amp_incr_u;
 
-    amp = _mm256_setr_ps(amp0, amp1, amp2, amp3, amp4, amp5, amp6, amp7);
     in = _mm256_setr_ps(inf0, inf1, inf2, inf3, inf4, inf5, inf6, inf7);
-
     in = _mm256_mul_ps(amp, in);
-
     _mm256_storeu_ps(&dsp_buf[i], in);
 
     if (dsp_phase_index > end_index)
@@ -1150,7 +1143,7 @@ fluid_voice_interpolate(fluid_voice_t *voice)
     dsp_cnt -= 2;
   }
 #else
-  int16_t in0, in1, in2, in3;
+  int32_t in0, in1, in2, in3;
   /*loop Unrolling */
   dsp_cnt = FLUID_BUFSIZE >> 2;
   dsp_phase_index = dsp_phase >> 32;
