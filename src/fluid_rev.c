@@ -59,7 +59,7 @@
 
 
 //#define DC_OFFSET 0
-#ifdef FLUID_BUFFER_S16
+#ifdef FLUID_FIXED_POINT
 #define DC_OFFSET 3
 #else
 #define DC_OFFSET 1e-8
@@ -163,7 +163,7 @@ void
 fluid_comb_setdamp(fluid_comb* comb, fluid_buf_t val)
 {
   comb->damp1 = val;
-  #ifdef FLUID_BUFFER_S16
+  #ifdef FLUID_FIXED_POINT
   comb->damp2 = 32768 - val;
   #else
   comb->damp2 = 1 - val;
@@ -199,7 +199,7 @@ fluid_buf_t fluid_comb_getfeedback(fluid_comb* comb)
 #define NUMCOMBS 8
 #define NUMALLPASSES 4
 
-#ifdef FLUID_BUFFER_S16
+#ifdef FLUID_FIXED_POINT
 #define FIXEDGAIN 256
 #else
 #define	FIXEDGAIN 0.015f

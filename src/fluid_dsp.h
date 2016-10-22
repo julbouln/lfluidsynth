@@ -1,6 +1,10 @@
 #ifndef FLUID_DSP_H
 #define FLUID_DSP_H
 
+#ifdef FLUID_AVX_OPT
+#include <x86intrin.h>
+#endif
+
 #ifdef FLUID_ARM_OPT
 	static __INLINE int32_t __SMULWB(int16_t a,int32_t b)
 	  {
@@ -15,7 +19,6 @@
   		  __asm__ ("smlawb %0, %1, %2,%3":"=r" (result): "r" (b), "r" (a), "r" (accu)) ;
 		  return result;
    	  }
-
 #else
 
 static int32_t __SSAT1(
@@ -60,27 +63,37 @@ static int32_t __SSAT(int32_t x, int32_t y)
 	else if (x < -(1 << (y-1))) return -(1 << (y-1))-1;
 	else return (int32_t)x;
 }
+
+#define __QADD(a, b) (int32_t)__SSAT(((int64_t)a+(int64_t)b),30)
+#define __QSUB(a, b) (int32_t)__SSAT(((int64_t)a-(int64_t)b),30)
+
 #endif
 
-#ifdef FLUID_BUFFER_S16
+#ifdef FLUID_FIXED_POINT
 	typedef int32_t fluid_buf_t; // q31_t / q17.15
 	typedef int16_t fluid_buf16_t; // q15_t / q1.15
 	#define FLUID_BUF_SAT(v) (int32_t) __SSAT(v,15)
 	#define FLUID_BUF_SAT32(v) (int32_t) __SSAT(v,30)
 	#define FLUID_BUF_FLOAT(v) (FLUID_BUF_SAT((v >> 15))/32768.0f)
 	#define FLUID_BUF_S16(v) (v >> 15)
+
+	#define FLUID_BUF_SAT_ADD32(a,b) __QADD(a,b)
+	#define FLUID_BUF_SAT_SUB32(a,b) __QSUB(a,b)
+
 //	#define FLUID_BUF_S16(v) (((v >> 15) >> 4) << 4) // 12 bits
 //	#define FLUID_BUF_S16(v) (((v >> 15) >> 7) << 7) // 8 bits
 
 	#define FLUID_BUF_SAMPLE(v) (v << 15)
 	#ifdef FLUID_ARM_OPT
 		#define FLUID_BUF_MULT(a,b) __SMULWB(a,b)
-		#define FLUID_BUF_MULT32(a,b) (int32_t)__SSAT(((int64_t)a*(int64_t)b) >> 15,30)
+//		#define FLUID_BUF_MULT32(a,b) (int32_t)__SSAT(((int64_t)a*(int64_t)b) >> 15,30)
+		#define FLUID_BUF_MULT32(a,b) (int32_t)(((int64_t)a*(int64_t)b) >> 15)
 		#define FLUID_BUF_MAC(a,b,accu) __SMLAWB(a,b,accu)
 		#define FLUID_BUF_MAC32(a,b,accu) (int32_t)(((int64_t)a*b) >> 15) + accu
 	#else
 		#define FLUID_BUF_MULT(a,b) (int32_t)(((int64_t)a*b) >> 15)
-		#define FLUID_BUF_MULT32(a,b) (int32_t)__SSAT(((int64_t)a*(int64_t)b) >> 15,30)
+//		#define FLUID_BUF_MULT32(a,b) (int32_t)__SSAT(((int64_t)a*(int64_t)b) >> 15,30)
+		#define FLUID_BUF_MULT32(a,b) (int32_t)(((int64_t)a*(int64_t)b) >> 15)
 		#define FLUID_BUF_MAC(a,b,accu) (int32_t)(((int64_t)a*b) >> 15) + accu
 		#define FLUID_BUF_MAC32(a,b,accu) (int32_t)(((int64_t)a*b) >> 15) + accu
 	#endif
@@ -92,8 +105,11 @@ static int32_t __SSAT(int32_t x, int32_t y)
 	typedef float fluid_buf16_t;
 	#define FLUID_BUF_FLOAT(v) v
 	#define FLUID_BUF_SAT(v) v
+	#define FLUID_BUF_SAT32(v) v
 	#define FLUID_BUF_S16(v) (v*32768.0f)
 	#define FLUID_BUF_SAMPLE(v) v
+	#define FLUID_BUF_SAT_ADD32(a,b) a+b
+	#define FLUID_BUF_SAT_SUB32(a,b) a-b
 	#define FLUID_BUF_MULT(a,b) a*b
 	#define FLUID_BUF_MULT32(a,b) a*b
 	#define FLUID_BUF_MAC(a,b,accu) a*b + accu

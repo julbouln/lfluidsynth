@@ -162,25 +162,33 @@ struct _fluid_voice_t
 	fluid_real_t last_fres;         /* Current resonance frequency of the IIR filter */
 	/* Serves as a flag: A deviation between fres and last_fres */
 	/* indicates, that the filter has to be recalculated. */
+
+
 	fluid_real_t q_lin;             /* the q-factor on a linear scale */
 	fluid_real_t filter_gain;       /* Gain correction factor, depends on q */
-	fluid_buf_t hist1, hist2;      /* Sample history for the IIR filter */
+
+#ifdef FLUID_SIMPLE_IIR
+	float vibrapos;
+	float vibraspeed;
 	uint8_t filter_startup;             /* Flag: If set, the filter will be set directly.
 					   Else it changes smoothly. */
+#else
+	fluid_buf_t hist1, hist2;      /* Sample history for the IIR filter */
 
 	/* filter coefficients */
 	/* The coefficients are normalized to a0. */
 	/* b0 and b2 are identical => b02 */
-	fluid_buf_t b02;              /* b0 / a0 */
-	fluid_buf_t b1;              /* b1 / a0 */
 	fluid_buf_t a1;              /* a0 / a0 */
 	fluid_buf_t a2;              /* a1 / a0 */
+	fluid_buf_t b1;              /* b1 / a0 */
+	fluid_buf_t b02;              /* b0 / a0 */
 
 	fluid_buf16_t b02_incr;
 	fluid_buf16_t b1_incr;
 	fluid_buf16_t a1_incr;
 	fluid_buf16_t a2_incr;
 	int filter_coeff_incr_count;
+#endif
 
 	/* pan */
 	fluid_real_t pan;
